@@ -20,6 +20,13 @@ type RestockForm = {
   reason: string;
 };
 
+type RemoveStockForm = {
+  productId: string;
+  productName: string;
+  qty: number;
+  reason: string;
+};
+
 const defaultForm: ProductForm = {
   name: '',
   category: 'Crochet',
@@ -37,6 +44,7 @@ export function InventoryPage() {
   const [form, setForm] = useState<ProductForm>(defaultForm);
 
   const [restock, setRestock] = useState<RestockForm | null>(null);
+  const [removeStock, setRemoveStock] = useState<RemoveStockForm | null>(null);
 
   async function load() {
     setLoading(true);
@@ -103,6 +111,19 @@ export function InventoryPage() {
     setRestock(null);
   }
 
+  function openRemoveStock(p: Product) {
+    setRemoveStock({
+      productId: String(p.id),
+      productName: p.name,
+      qty: 1,
+      reason: 'Damaged / Lost'
+    });
+  }
+
+  function closeRemoveStock() {
+    setRemoveStock(null);
+  }
+
   async function submitRestock() {
     if (!restock) return;
     const qty = Math.max(1, Math.floor(restock.qty || 1));
@@ -114,6 +135,20 @@ export function InventoryPage() {
       await load();
     } catch (e: any) {
       alert(e?.message ?? 'Failed to restock');
+    }
+  }
+
+  async function submitRemoveStock() {
+    if (!removeStock) return;
+    const qty = Math.max(1, Math.floor(removeStock.qty || 1));
+    const reason = removeStock.reason?.trim() || 'Stock adjustment';
+
+    try {
+      await api.post(`/api/products/${removeStock.productId}/decrease`, { qty, reason });
+      closeRemoveStock();
+      await load();
+    } catch (e: any) {
+      alert(e?.message ?? 'Failed to remove stock');
     }
   }
 
@@ -182,13 +217,22 @@ export function InventoryPage() {
                       </span>
                     </td>
                     <td className='px-5 py-4'>
-                      <button
-                        type='button'
-                        onClick={() => openRestock(p)}
-                        className='rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50'
-                      >
-                        Restock
-                      </button>
+                      <div className='flex items-center gap-2'>
+                        <button
+                          type='button'
+                          onClick={() => openRestock(p)}
+                          className='rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50'
+                        >
+                          Restock
+                        </button>
+                        <button
+                          type='button'
+                          onClick={() => openRemoveStock(p)}
+                          className='rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm hover:bg-red-50'
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -328,6 +372,57 @@ export function InventoryPage() {
                 className='mt-2 w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-soft hover:bg-brand-700'
               >
                 Restock
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {removeStock && (
+        <div className='fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4'>
+          <div className='w-full max-w-xl rounded-2xl bg-white p-8 shadow-soft'>
+            <div className='flex items-center justify-between'>
+              <div className='text-lg font-extrabold text-slate-900'>Remove Stock</div>
+              <button
+                type='button'
+                onClick={closeRemoveStock}
+                className='rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                aria-label='Close'
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className='mt-2 text-sm text-slate-500'>{removeStock.productName}</div>
+
+            <div className='mt-6 space-y-5'>
+              <div>
+                <div className='text-sm font-semibold text-slate-700'>Quantity</div>
+                <input
+                  type='number'
+                  min={1}
+                  step='1'
+                  className='mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-brand-300'
+                  value={removeStock.qty}
+                  onChange={(e) => setRemoveStock({ ...removeStock, qty: Number(e.target.value) })}
+                />
+              </div>
+
+              <div>
+                <div className='text-sm font-semibold text-slate-700'>Reason</div>
+                <input
+                  className='mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-brand-300'
+                  value={removeStock.reason}
+                  onChange={(e) => setRemoveStock({ ...removeStock, reason: e.target.value })}
+                />
+              </div>
+
+              <button
+                type='button'
+                onClick={submitRemoveStock}
+                className='mt-2 w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white shadow-soft hover:bg-red-700'
+              >
+                Remove Stock
               </button>
             </div>
           </div>

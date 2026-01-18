@@ -55,6 +55,32 @@ export async function restockProduct(id: string, qty: number, reason: string) {
   });
 }
 
+export async function decreaseStockProduct(id: string, qty: number, reason: string) {
+  const _id = new mongoose.Types.ObjectId(id);
+  const dec = Math.max(1, Math.floor(qty));
+
+  // Only decrease if there is enough stock
+  const p = await Product.findOneAndUpdate(
+    { _id, stock: { $gte: dec } },
+    { $inc: { stock: -dec } },
+    { new: true }
+  );
+  if (!p) {
+    // Could be "not found" OR "not enough stock". Provide a helpful message.
+    const exists = await Product.exists({ _id });
+    if (!exists) throw new Error('Product not found');
+    throw new Error('Insufficient stock to remove that quantity');
+  }
+
+  await InventoryLog.create({
+    product_id: p._id,
+    product_name: p.name,
+    change_type: 'ADJUSTMENT',
+    qty_change: -dec,
+    reason
+  });
+}
+
 export async function inventorySummary() {
   const totalsAgg = await Product.aggregate([
     {

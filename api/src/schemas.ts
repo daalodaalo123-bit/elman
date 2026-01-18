@@ -18,6 +18,11 @@ export const RestockSchema = z.object({
   reason: z.string().min(1).default('Restock')
 });
 
+export const DecreaseStockSchema = z.object({
+  qty: z.number().int().positive(),
+  reason: z.string().min(1).default('Stock adjustment')
+});
+
 export const CreateCustomerSchema = z.object({
   name: z.string().min(1),
   phone: z.string().optional(),

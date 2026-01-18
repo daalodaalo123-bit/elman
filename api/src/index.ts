@@ -10,12 +10,14 @@ import {
   CreateExpenseSchema,
   CreateProductSchema,
   CreateSaleSchema,
+  DecreaseStockSchema,
   RestockSchema,
   UpdateCustomerSchema,
   UpdateProductSchema
 } from './schemas.js';
 import {
   createProduct,
+  decreaseStockProduct,
   inventorySummary,
   listProducts,
   restockProduct,
@@ -187,6 +189,16 @@ app.post(
     const parsed = RestockSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
     await restockProduct(String(req.params.id), parsed.data.qty, parsed.data.reason);
+    res.json({ ok: true });
+  })
+);
+
+app.post(
+  '/api/products/:id/decrease',
+  asyncHandler(async (req, res) => {
+    const parsed = DecreaseStockSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+    await decreaseStockProduct(String(req.params.id), parsed.data.qty, parsed.data.reason);
     res.json({ ok: true });
   })
 );
