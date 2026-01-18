@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X } from 'lucide-react';
+import { Pencil, X } from 'lucide-react';
 import { Card } from '../components/Card';
 import { api } from '../lib/api';
 import type { Product } from '../lib/types';
@@ -27,6 +27,13 @@ type RemoveStockForm = {
   reason: string;
 };
 
+type EditProductForm = {
+  productId: string;
+  productName: string;
+  price: number;
+  low_stock_threshold: number;
+};
+
 const defaultForm: ProductForm = {
   name: '',
   category: 'Crochet',
@@ -45,6 +52,7 @@ export function InventoryPage() {
 
   const [restock, setRestock] = useState<RestockForm | null>(null);
   const [removeStock, setRemoveStock] = useState<RemoveStockForm | null>(null);
+  const [editProduct, setEditProduct] = useState<EditProductForm | null>(null);
 
   async function load() {
     setLoading(true);
@@ -124,6 +132,19 @@ export function InventoryPage() {
     setRemoveStock(null);
   }
 
+  function openEdit(p: Product) {
+    setEditProduct({
+      productId: String(p.id),
+      productName: p.name,
+      price: Number(p.price ?? 0),
+      low_stock_threshold: Number(p.low_stock_threshold ?? 0)
+    });
+  }
+
+  function closeEdit() {
+    setEditProduct(null);
+  }
+
   async function submitRestock() {
     if (!restock) return;
     const qty = Math.max(1, Math.floor(restock.qty || 1));
@@ -149,6 +170,20 @@ export function InventoryPage() {
       await load();
     } catch (e: any) {
       alert(e?.message ?? 'Failed to remove stock');
+    }
+  }
+
+  async function submitEdit() {
+    if (!editProduct) return;
+    const price = Math.max(0, Number(editProduct.price || 0));
+    const low_stock_threshold = Math.max(0, Math.floor(editProduct.low_stock_threshold || 0));
+
+    try {
+      await api.put(`/api/products/${editProduct.productId}`, { price, low_stock_threshold });
+      closeEdit();
+      await load();
+    } catch (e: any) {
+      alert(e?.message ?? 'Failed to update product');
     }
   }
 
@@ -218,6 +253,15 @@ export function InventoryPage() {
                     </td>
                     <td className='px-5 py-4'>
                       <div className='flex items-center gap-2'>
+                        <button
+                          type='button'
+                          onClick={() => openEdit(p)}
+                          className='inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50'
+                          title='Edit price'
+                        >
+                          <Pencil size={16} />
+                          Edit
+                        </button>
                         <button
                           type='button'
                           onClick={() => openRestock(p)}
@@ -372,6 +416,62 @@ export function InventoryPage() {
                 className='mt-2 w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-soft hover:bg-brand-700'
               >
                 Restock
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editProduct && (
+        <div className='fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4'>
+          <div className='w-full max-w-xl rounded-2xl bg-white p-8 shadow-soft'>
+            <div className='flex items-center justify-between'>
+              <div className='text-lg font-extrabold text-slate-900'>Edit Product</div>
+              <button
+                type='button'
+                onClick={closeEdit}
+                className='rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                aria-label='Close'
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className='mt-2 text-sm text-slate-500'>{editProduct.productName}</div>
+
+            <div className='mt-6 space-y-5'>
+              <div>
+                <div className='text-sm font-semibold text-slate-700'>Unit price ($)</div>
+                <input
+                  type='number'
+                  min={0}
+                  step='0.01'
+                  className='mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-brand-300'
+                  value={editProduct.price}
+                  onChange={(e) => setEditProduct({ ...editProduct, price: Number(e.target.value) })}
+                />
+              </div>
+
+              <div>
+                <div className='text-sm font-semibold text-slate-700'>Low stock threshold</div>
+                <input
+                  type='number'
+                  min={0}
+                  step='1'
+                  className='mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-brand-300'
+                  value={editProduct.low_stock_threshold}
+                  onChange={(e) =>
+                    setEditProduct({ ...editProduct, low_stock_threshold: Number(e.target.value) })
+                  }
+                />
+              </div>
+
+              <button
+                type='button'
+                onClick={submitEdit}
+                className='mt-2 w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-soft hover:bg-brand-700'
+              >
+                Save Changes
               </button>
             </div>
           </div>
