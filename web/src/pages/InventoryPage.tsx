@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pencil, X } from 'lucide-react';
+import { History, Pencil, X } from 'lucide-react';
 import { Card } from '../components/Card';
 import { api } from '../lib/api';
-import type { Product } from '../lib/types';
+import type { Product, ProductHistoryRow } from '../lib/types';
 import { money } from '../lib/format';
 
 type ProductForm = {
@@ -31,6 +31,8 @@ type EditProductForm = {
   productId: string;
   productName: string;
   price: number;
+  unit_cost: number;
+  sku: string;
   low_stock_threshold: number;
 };
 
@@ -53,6 +55,11 @@ export function InventoryPage() {
   const [restock, setRestock] = useState<RestockForm | null>(null);
   const [removeStock, setRemoveStock] = useState<RemoveStockForm | null>(null);
   const [editProduct, setEditProduct] = useState<EditProductForm | null>(null);
+  const [historyFor, setHistoryFor] = useState<{ productId: string; productName: string } | null>(
+    null
+  );
+  const [historyRows, setHistoryRows] = useState<ProductHistoryRow[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -137,6 +144,8 @@ export function InventoryPage() {
       productId: String(p.id),
       productName: p.name,
       price: Number(p.price ?? 0),
+      unit_cost: Number(p.unit_cost ?? 0),
+      sku: String(p.sku ?? ''),
       low_stock_threshold: Number(p.low_stock_threshold ?? 0)
     });
   }
@@ -176,15 +185,37 @@ export function InventoryPage() {
   async function submitEdit() {
     if (!editProduct) return;
     const price = Math.max(0, Number(editProduct.price || 0));
+    const unit_cost = Math.max(0, Number(editProduct.unit_cost || 0));
+    const sku = editProduct.sku.trim() || undefined;
     const low_stock_threshold = Math.max(0, Math.floor(editProduct.low_stock_threshold || 0));
 
     try {
-      await api.put(`/api/products/${editProduct.productId}`, { price, low_stock_threshold });
+      await api.put(`/api/products/${editProduct.productId}`, { price, unit_cost, sku, low_stock_threshold });
       closeEdit();
       await load();
     } catch (e: any) {
       alert(e?.message ?? 'Failed to update product');
     }
+  }
+
+  async function openHistory(p: Product) {
+    setHistoryFor({ productId: String(p.id), productName: p.name });
+    setHistoryRows([]);
+    setHistoryLoading(true);
+    try {
+      const rows = await api.get<ProductHistoryRow[]>(`/api/products/${p.id}/history`);
+      setHistoryRows(rows);
+    } catch (e: any) {
+      alert(e?.message ?? 'Failed to load history');
+      setHistoryFor(null);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  function closeHistory() {
+    setHistoryFor(null);
+    setHistoryRows([]);
   }
 
   return (
@@ -253,6 +284,15 @@ export function InventoryPage() {
                     </td>
                     <td className='px-5 py-4'>
                       <div className='flex items-center gap-2'>
+                        <button
+                          type='button'
+                          onClick={() => openHistory(p)}
+                          className='inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50'
+                          title='View stock history'
+                        >
+                          <History size={16} />
+                          History
+                        </button>
                         <button
                           type='button'
                           onClick={() => openEdit(p)}
@@ -441,6 +481,16 @@ export function InventoryPage() {
 
             <div className='mt-6 space-y-5'>
               <div>
+                <div className='text-sm font-semibold text-slate-700'>SKU / Barcode (optional)</div>
+                <input
+                  className='mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-brand-300'
+                  value={editProduct.sku}
+                  onChange={(e) => setEditProduct({ ...editProduct, sku: e.target.value })}
+                />
+                <div className='mt-1 text-xs text-slate-500'>Use this for barcode scanning later.</div>
+              </div>
+
+              <div>
                 <div className='text-sm font-semibold text-slate-700'>Unit price ($)</div>
                 <input
                   type='number'
@@ -450,6 +500,21 @@ export function InventoryPage() {
                   value={editProduct.price}
                   onChange={(e) => setEditProduct({ ...editProduct, price: Number(e.target.value) })}
                 />
+              </div>
+
+              <div>
+                <div className='text-sm font-semibold text-slate-700'>Unit cost ($)</div>
+                <input
+                  type='number'
+                  min={0}
+                  step='0.01'
+                  className='mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-brand-300'
+                  value={editProduct.unit_cost}
+                  onChange={(e) =>
+                    setEditProduct({ ...editProduct, unit_cost: Number(e.target.value) })
+                  }
+                />
+                <div className='mt-1 text-xs text-slate-500'>Used for profit reports.</div>
               </div>
 
               <div>
@@ -473,6 +538,65 @@ export function InventoryPage() {
               >
                 Save Changes
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {historyFor && (
+        <div className='fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4'>
+          <div className='w-full max-w-3xl rounded-2xl bg-white p-8 shadow-soft'>
+            <div className='flex items-center justify-between'>
+              <div className='text-lg font-extrabold text-slate-900'>Stock History</div>
+              <button
+                type='button'
+                onClick={closeHistory}
+                className='rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                aria-label='Close'
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className='mt-2 text-sm text-slate-500'>{historyFor.productName}</div>
+
+            <div className='mt-5 overflow-hidden rounded-xl border border-slate-200'>
+              <table className='w-full text-left text-sm'>
+                <thead className='bg-slate-50 text-slate-600'>
+                  <tr>
+                    <th className='px-4 py-3 font-medium'>Date</th>
+                    <th className='px-4 py-3 font-medium'>Type</th>
+                    <th className='px-4 py-3 font-medium'>Qty</th>
+                    <th className='px-4 py-3 font-medium'>Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyLoading ? (
+                    <tr>
+                      <td colSpan={4} className='px-4 py-10 text-center text-slate-500'>
+                        Loading...
+                      </td>
+                    </tr>
+                  ) : historyRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className='px-4 py-10 text-center text-slate-500'>
+                        No history yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    historyRows.map((h, idx) => (
+                      <tr key={idx} className='border-t border-slate-200'>
+                        <td className='px-4 py-3 text-slate-600'>
+                          {new Date(String(h.date)).toLocaleString()}
+                        </td>
+                        <td className='px-4 py-3 font-medium text-slate-900'>{h.change_type}</td>
+                        <td className='px-4 py-3 font-semibold text-slate-900'>{h.qty_change}</td>
+                        <td className='px-4 py-3 text-slate-600'>{h.reason}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

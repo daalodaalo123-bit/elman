@@ -7,7 +7,9 @@ export async function listProducts() {
     id: String(p._id),
     name: p.name,
     category: p.category,
+    sku: p.sku ?? null,
     price: p.price,
+    unit_cost: p.unit_cost ?? 0,
     stock: p.stock,
     low_stock_threshold: p.low_stock_threshold,
     created_at: p.created_at
@@ -18,7 +20,9 @@ export async function createProduct(input: any) {
   const p = await Product.create({
     name: input.name,
     category: input.category,
+    sku: input.sku,
     price: input.price,
+    unit_cost: input.unit_cost ?? 0,
     stock: input.stock ?? 0,
     low_stock_threshold: input.low_stock_threshold ?? 0
   });
@@ -39,6 +43,17 @@ export async function createProduct(input: any) {
 export async function updateProduct(id: string, patch: any) {
   const _id = new mongoose.Types.ObjectId(id);
   await Product.updateOne({ _id }, { $set: patch });
+}
+
+export async function productStockHistory(id: string) {
+  const _id = new mongoose.Types.ObjectId(id);
+  const rows = await InventoryLog.find({ product_id: _id }).sort({ created_at: -1 }).limit(200).lean();
+  return rows.map((h: any) => ({
+    date: h.created_at,
+    change_type: h.change_type,
+    qty_change: h.qty_change,
+    reason: h.reason
+  }));
 }
 
 export async function restockProduct(id: string, qty: number, reason: string) {

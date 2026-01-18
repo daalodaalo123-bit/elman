@@ -4,10 +4,79 @@ export type Product = {
   id: string;
   name: string;
   category: string;
+  sku?: string | null;
   price: number;
+  unit_cost?: number;
   stock: number;
   low_stock_threshold: number;
   created_at: string;
+};
+
+export type ProfitReport = {
+  period: 'daily' | 'weekly' | 'monthly';
+  start: string;
+  totals: {
+    revenue: number;
+    transactions: number;
+    expenses: number;
+    gross_profit: number;
+    net_profit: number;
+  };
+  series: Array<{
+    day: string;
+    revenue: number;
+    expenses: number;
+    gross_profit: number;
+    net_profit: number;
+  }>;
+};
+
+export type TopProductsReport = {
+  period: 'daily' | 'weekly' | 'monthly';
+  start: string;
+  rows: Array<{
+    product_id: string;
+    product_name: string;
+    qty_sold: number;
+    revenue: number;
+    profit: number;
+  }>;
+};
+
+export type CustomerInsightsReport = {
+  period: 'daily' | 'weekly' | 'monthly';
+  start: string;
+  days: number;
+  rows: Array<{
+    customer: string;
+    transactions: number;
+    revenue: number;
+    unpaid_total: number;
+    last_purchase: string;
+    purchase_frequency_per_day: number;
+  }>;
+};
+
+export type LowStockReport = {
+  total_low_stock: number;
+  rows: Array<{
+    id: string;
+    name: string;
+    category: string;
+    sku: string | null;
+    price: number;
+    unit_cost: number;
+    stock: number;
+    low_stock_threshold: number;
+    suggested_restock: number;
+  }>;
+};
+
+export type ProductHistoryRow = {
+  date: string;
+  change_type: 'SALE' | 'RESTOCK' | 'ADJUSTMENT';
+  qty_change: number;
+  reason: string;
 };
 
 export type Customer = {

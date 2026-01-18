@@ -20,6 +20,7 @@ import {
   decreaseStockProduct,
   inventorySummary,
   listProducts,
+  productStockHistory,
   restockProduct,
   updateProduct
 } from './inventory.js';
@@ -27,6 +28,12 @@ import { createSale, getSaleByReceipt, getSalesHistory, salesReport } from './sa
 import { createCustomer, listCustomers, updateCustomer } from './customers.js';
 import { createExpense, getExpense, listExpenses } from './expenses.js';
 import { sendPdf, hr, kv, money, tableHeader, tableRow, title } from './pdf.js';
+import {
+  customerInsightsReport,
+  lowStockReport,
+  profitReport,
+  topProductsReport
+} from './reports.js';
 
 dotenv.config();
 
@@ -204,9 +211,56 @@ app.post(
 );
 
 app.get(
+  '/api/products/:id/history',
+  asyncHandler(async (req, res) => {
+    res.json(await productStockHistory(String(req.params.id)));
+  })
+);
+
+app.get(
   '/api/reports/inventory',
   asyncHandler(async (_req, res) => {
     res.json(await inventorySummary());
+  })
+);
+
+app.get(
+  '/api/reports/profit',
+  asyncHandler(async (req, res) => {
+    const p = (String(req.query.period ?? 'monthly') as any) ?? 'monthly';
+    if (p !== 'daily' && p !== 'weekly' && p !== 'monthly') {
+      return res.status(400).json({ error: 'Invalid period' });
+    }
+    res.json(await profitReport(p));
+  })
+);
+
+app.get(
+  '/api/reports/top-products',
+  asyncHandler(async (req, res) => {
+    const p = (String(req.query.period ?? 'monthly') as any) ?? 'monthly';
+    if (p !== 'daily' && p !== 'weekly' && p !== 'monthly') {
+      return res.status(400).json({ error: 'Invalid period' });
+    }
+    res.json(await topProductsReport(p));
+  })
+);
+
+app.get(
+  '/api/reports/customer-insights',
+  asyncHandler(async (req, res) => {
+    const p = (String(req.query.period ?? 'monthly') as any) ?? 'monthly';
+    if (p !== 'daily' && p !== 'weekly' && p !== 'monthly') {
+      return res.status(400).json({ error: 'Invalid period' });
+    }
+    res.json(await customerInsightsReport(p));
+  })
+);
+
+app.get(
+  '/api/reports/low-stock',
+  asyncHandler(async (_req, res) => {
+    res.json(await lowStockReport());
   })
 );
 

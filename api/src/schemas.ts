@@ -6,7 +6,9 @@ export type PaymentMethod = z.infer<typeof PaymentMethodSchema>;
 export const CreateProductSchema = z.object({
   name: z.string().min(1),
   category: z.string().min(1),
+  sku: z.string().min(1).optional(),
   price: z.number().nonnegative(),
+  unit_cost: z.number().nonnegative().default(0),
   stock: z.number().int().nonnegative().default(0),
   low_stock_threshold: z.number().int().nonnegative().default(0)
 });
