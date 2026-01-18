@@ -1,6 +1,43 @@
 ## Elman Crochet Sales, Inventory, CRM, Expenses
 
-### Local setup (PostgreSQL)
+### Local setup (MongoDB + Auth)
+
+1) Create `api/.env`:
+
+```env
+MONGODB_URI=your_mongodb_connection_string
+JWT_SECRET=some_long_random_secret
+BOOTSTRAP_SECRET=some_long_random_secret
+NODE_ENV=development
+```
+
+2) Install deps:
+
+```bash
+npm install
+```
+
+3) Start dev servers:
+
+```bash
+npm run dev
+```
+
+4) Bootstrap the first owner user (one-time):
+
+Send this request (replace values):
+
+```bash
+curl -X POST http://localhost:5050/api/auth/bootstrap ^
+  -H "Content-Type: application/json" ^
+  -H "x-bootstrap-secret: <BOOTSTRAP_SECRET>" ^
+  -d "{\"username\":\"owner\",\"password\":\"ownerpass123\"}"
+```
+
+Then login at `http://localhost:5173/login`.
+
+### (Old) Local setup (PostgreSQL)
+This section is outdated; the current backend uses MongoDB.
 
 1) Start PostgreSQL (recommended via Docker):
 

@@ -194,6 +194,62 @@ export const Refund =
   (mongoose.models.Refund as mongoose.Model<RefundDoc>) ||
   mongoose.model<RefundDoc>('Refund', RefundSchema);
 
+export type UserDoc = {
+  username: string;
+  password_hash: string;
+  role: 'owner' | 'cashier';
+  created_at: Date;
+};
+
+const UserSchema = new Schema<UserDoc>(
+  {
+    username: { type: String, required: true, trim: true, unique: true },
+    password_hash: { type: String, required: true },
+    role: { type: String, required: true },
+    created_at: { type: Date, default: () => new Date() }
+  },
+  { collection: 'users' }
+);
+UserSchema.index({ username: 1 }, { unique: true });
+
+export const User =
+  (mongoose.models.User as mongoose.Model<UserDoc>) || mongoose.model<UserDoc>('User', UserSchema);
+
+export type AuditLogDoc = {
+  at: Date;
+  user_id?: mongoose.Types.ObjectId;
+  username?: string;
+  role?: string;
+  action: string;
+  entity: string;
+  entity_id?: string;
+  meta?: any;
+  ip?: string;
+  user_agent?: string;
+};
+
+const AuditLogSchema = new Schema<AuditLogDoc>(
+  {
+    at: { type: Date, default: () => new Date() },
+    user_id: { type: Schema.Types.ObjectId, ref: 'User' },
+    username: { type: String },
+    role: { type: String },
+    action: { type: String, required: true },
+    entity: { type: String, required: true },
+    entity_id: { type: String },
+    meta: { type: Schema.Types.Mixed },
+    ip: { type: String },
+    user_agent: { type: String }
+  },
+  { collection: 'audit_log' }
+);
+AuditLogSchema.index({ at: -1 });
+AuditLogSchema.index({ entity: 1, at: -1 });
+
+export const AuditLog =
+  (mongoose.models.AuditLog as mongoose.Model<AuditLogDoc>) ||
+  mongoose.model<AuditLogDoc>('AuditLog', AuditLogSchema);
+
 export type ExpenseItem = {
   item_name: string;
   quantity: number;

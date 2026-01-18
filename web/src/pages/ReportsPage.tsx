@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
 import { Card } from '../components/Card';
 import { api } from '../lib/api';
+import { apiPathWithToken } from '../lib/api';
 import type { InventoryReport } from '../lib/types';
 import { money } from '../lib/format';
 
@@ -53,7 +54,7 @@ export function ReportsPage() {
           <div className='mt-1 text-slate-500'>Summary and movement history</div>
         </div>
         <a
-          href='/api/reports/inventory/pdf'
+          href={apiPathWithToken('/api/reports/inventory/pdf')}
           className='inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50'
         >
           <Download size={16} />

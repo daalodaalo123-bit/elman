@@ -4,6 +4,7 @@ import { Card } from '../components/Card';
 import { api } from '../lib/api';
 import type { SaleDetail, SalesHistoryRow } from '../lib/types';
 import { money } from '../lib/format';
+import { apiPathWithToken } from '../lib/api';
 
 type RefundDraft = {
   receipt_ref: string;
@@ -214,7 +215,7 @@ export function HistoryPage() {
                     <td className='px-5 py-4 whitespace-nowrap align-top'>
                       <a
                         className='inline-flex rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50'
-                        href={`/api/sales/${r.receipt_ref}/pdf`}
+                        href={apiPathWithToken(`/api/sales/${r.receipt_ref}/pdf`)}
                       >
                         Download Receipt
                       </a>

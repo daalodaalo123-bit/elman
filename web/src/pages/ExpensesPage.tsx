@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { Card } from '../components/Card';
 import { api } from '../lib/api';
+import { apiPathWithToken } from '../lib/api';
 import type {
   ExpenseCategory,
   ExpenseDetail,
@@ -283,7 +284,7 @@ export function ExpensesPage() {
               <div className='flex items-center gap-2'>
                 <a
                   className='no-print rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50'
-                  href={`/api/expenses/${openId}/pdf`}
+                  href={apiPathWithToken(`/api/expenses/${openId}/pdf`)}
                 >
                   Download PDF
                 </a>

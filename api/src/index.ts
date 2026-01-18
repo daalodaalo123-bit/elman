@@ -5,6 +5,9 @@ import { z } from 'zod';
 import path from 'node:path';
 import fs from 'node:fs';
 import { connectDb, dbStatus } from './db/db.js';
+import { findUserByUsername, hashPassword, signToken, verifyPassword } from './auth.js';
+import { audit } from './audit.js';
+import { requireAuth, requireRole, type RequestWithUser } from './middleware/authz.js';
 import {
   CreateCustomerSchema,
   CreateExpenseSchema,
@@ -41,6 +44,7 @@ import {
   profitReport,
   topProductsReport
 } from './reports.js';
+import { AuditLog, User } from './models.js';
 
 dotenv.config();
 
@@ -55,7 +59,7 @@ const asyncHandler =
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 
-// Ensure DB connected for API routes
+// Ensure DB connected for API routes (including /api/auth/*)
 app.use(
   asyncHandler(async (req, _res, next) => {
     if (req.path.startsWith('/api')) {
@@ -64,6 +68,66 @@ app.use(
     next();
   })
 );
+
+// --- Auth routes (no auth required) ---
+app.post(
+  '/api/auth/bootstrap',
+  asyncHandler(async (req, res) => {
+    const secret = process.env.BOOTSTRAP_SECRET;
+    if (!secret) return res.status(500).json({ error: 'BOOTSTRAP_SECRET is not set on server' });
+    if (String(req.headers['x-bootstrap-secret'] ?? '') !== secret) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const schema = z.object({
+      username: z.string().min(1),
+      password: z.string().min(6)
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+    const count = await User.countDocuments({});
+    if (count > 0) return res.status(400).json({ error: 'Already bootstrapped' });
+
+    const password_hash = await hashPassword(parsed.data.password);
+    const u = await User.create({ username: parsed.data.username.trim(), password_hash, role: 'owner' });
+    await audit(req, { id: String(u._id), username: u.username, role: 'owner' }, 'auth.bootstrap', 'user', String(u._id));
+    res.json({ ok: true });
+  })
+);
+
+app.post(
+  '/api/auth/login',
+  asyncHandler(async (req, res) => {
+    const schema = z.object({
+      username: z.string().min(1),
+      password: z.string().min(1)
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+    const u = await findUserByUsername(parsed.data.username.trim());
+    if (!u) return res.status(401).json({ error: 'Invalid username or password' });
+    const ok = await verifyPassword(parsed.data.password, u.password_hash);
+    if (!ok) return res.status(401).json({ error: 'Invalid username or password' });
+
+    const user = { id: u.id, username: u.username, role: u.role };
+    const token = signToken(user);
+    await audit(req, user, 'auth.login', 'user', u.id);
+    res.json({ token, user });
+  })
+);
+
+app.get(
+  '/api/auth/me',
+  requireAuth as any,
+  asyncHandler(async (req: RequestWithUser, res) => {
+    res.json({ user: req.user });
+  })
+);
+
+// Require auth for all remaining /api routes
+app.use('/api', requireAuth as any);
 
 // connect to MongoDB Atlas (best-effort)
 connectDb().catch((err) => {
@@ -77,6 +141,7 @@ app.get('/health', (_req, res) => {
 // --- Customers (CRM) ---
 app.get(
   '/api/customers',
+  requireRole(['owner', 'cashier']) as any,
   asyncHandler(async (req, res) => {
     const search = typeof req.query.search === 'string' ? req.query.search : undefined;
     res.json(await listCustomers(search));
@@ -85,20 +150,24 @@ app.get(
 
 app.post(
   '/api/customers',
+  requireRole(['owner']) as any,
   asyncHandler(async (req, res) => {
     const parsed = CreateCustomerSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
     const id = await createCustomer(parsed.data);
+    await audit(req, (req as any).user ?? null, 'customer.create', 'customer', String(id));
     res.status(201).json({ id });
   })
 );
 
 app.put(
   '/api/customers/:id',
+  requireRole(['owner']) as any,
   asyncHandler(async (req, res) => {
     const parsed = UpdateCustomerSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
     await updateCustomer(String(req.params.id), parsed.data);
+    await audit(req, (req as any).user ?? null, 'customer.update', 'customer', String(req.params.id), parsed.data);
     res.json({ ok: true });
   })
 );
@@ -106,6 +175,7 @@ app.put(
 // --- Expenses ---
 app.get(
   '/api/expenses',
+  requireRole(['owner']) as any,
   asyncHandler(async (req, res) => {
     const search = typeof req.query.search === 'string' ? req.query.search : undefined;
     res.json(await listExpenses({ search }));
@@ -114,6 +184,7 @@ app.get(
 
 app.get(
   '/api/expenses/:id',
+  requireRole(['owner']) as any,
   asyncHandler(async (req, res) => {
     const exp = await getExpense(String(req.params.id));
     if (!exp) return res.status(404).json({ error: 'Not found' });
@@ -123,6 +194,7 @@ app.get(
 
 app.get(
   '/api/expenses/:id/pdf',
+  requireRole(['owner']) as any,
   asyncHandler(async (req, res) => {
     const exp = await getExpense(String(req.params.id));
     if (!exp) return res.status(404).json({ error: 'Not found' });
@@ -157,11 +229,13 @@ app.get(
 
 app.post(
   '/api/expenses',
+  requireRole(['owner']) as any,
   asyncHandler(async (req, res) => {
     const parsed = CreateExpenseSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
     try {
       const id = await createExpense(parsed.data);
+      await audit(req, (req as any).user ?? null, 'expense.create', 'expense', String(id), parsed.data);
       res.status(201).json({ id });
     } catch (e: any) {
       res.status(400).json({ error: e?.message ?? 'Expense failed' });
@@ -172,53 +246,149 @@ app.post(
 // Products / Inventory
 app.get(
   '/api/products',
+  requireRole(['owner', 'cashier']) as any,
   asyncHandler(async (_req, res) => {
     res.json(await listProducts());
   })
 );
 
+// --- Users (Owner only) ---
+app.get(
+  '/api/users',
+  requireRole(['owner']) as any,
+  asyncHandler(async (_req, res) => {
+    const rows = await User.find({}).sort({ created_at: -1 }).select('username role created_at').lean();
+    res.json(rows.map((u: any) => ({ id: String(u._id), username: u.username, role: u.role, created_at: u.created_at })));
+  })
+);
+
+app.post(
+  '/api/users',
+  requireRole(['owner']) as any,
+  asyncHandler(async (req, res) => {
+    const schema = z.object({
+      username: z.string().min(1),
+      password: z.string().min(6),
+      role: z.enum(['owner', 'cashier']).default('cashier')
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+    const username = parsed.data.username.trim();
+    const password_hash = await hashPassword(parsed.data.password);
+    try {
+      const u = await User.create({ username, password_hash, role: parsed.data.role });
+      await audit(req, (req as any).user ?? null, 'user.create', 'user', String(u._id), { username, role: parsed.data.role });
+      res.status(201).json({ id: String(u._id) });
+    } catch (e: any) {
+      const msg = e?.code === 11000 ? 'Username already exists' : (e?.message ?? 'User create failed');
+      res.status(400).json({ error: msg });
+    }
+  })
+);
+
+app.put(
+  '/api/users/:id',
+  requireRole(['owner']) as any,
+  asyncHandler(async (req, res) => {
+    const schema = z.object({
+      password: z.string().min(6).optional(),
+      role: z.enum(['owner', 'cashier']).optional()
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+    const patch: any = {};
+    if (parsed.data.password) {
+      patch.password_hash = await hashPassword(parsed.data.password);
+    }
+    if (parsed.data.role) {
+      patch.role = parsed.data.role;
+    }
+    await User.updateOne({ _id: req.params.id }, { $set: patch });
+    await audit(req, (req as any).user ?? null, 'user.update', 'user', String(req.params.id), { ...parsed.data, password: parsed.data.password ? '***' : undefined });
+    res.json({ ok: true });
+  })
+);
+
+// --- Audit (Owner only) ---
+app.get(
+  '/api/audit',
+  requireRole(['owner']) as any,
+  asyncHandler(async (req, res) => {
+    const limit = Math.max(1, Math.min(500, Number(req.query.limit ?? 200)));
+    const entity = typeof req.query.entity === 'string' ? req.query.entity : undefined;
+    const action = typeof req.query.action === 'string' ? req.query.action : undefined;
+    const filter: any = {};
+    if (entity) filter.entity = entity;
+    if (action) filter.action = action;
+    const rows = await AuditLog.find(filter).sort({ at: -1 }).limit(limit).lean();
+    res.json(
+      rows.map((r: any) => ({
+        id: String(r._id),
+        at: r.at,
+        username: r.username ?? null,
+        role: r.role ?? null,
+        action: r.action,
+        entity: r.entity,
+        entity_id: r.entity_id ?? null,
+        meta: r.meta ?? null
+      }))
+    );
+  })
+);
+
 app.post(
   '/api/products',
+  requireRole(['owner']) as any,
   asyncHandler(async (req, res) => {
     const parsed = CreateProductSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
     const id = await createProduct(parsed.data);
+    await audit(req, (req as any).user ?? null, 'product.create', 'product', String(id), parsed.data);
     res.status(201).json({ id });
   })
 );
 
 app.put(
   '/api/products/:id',
+  requireRole(['owner']) as any,
   asyncHandler(async (req, res) => {
     const parsed = UpdateProductSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
     await updateProduct(String(req.params.id), parsed.data);
+    await audit(req, (req as any).user ?? null, 'product.update', 'product', String(req.params.id), parsed.data);
     res.json({ ok: true });
   })
 );
 
 app.post(
   '/api/products/:id/restock',
+  requireRole(['owner']) as any,
   asyncHandler(async (req, res) => {
     const parsed = RestockSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
     await restockProduct(String(req.params.id), parsed.data.qty, parsed.data.reason);
+    await audit(req, (req as any).user ?? null, 'product.restock', 'product', String(req.params.id), parsed.data);
     res.json({ ok: true });
   })
 );
 
 app.post(
   '/api/products/:id/decrease',
+  requireRole(['owner']) as any,
   asyncHandler(async (req, res) => {
     const parsed = DecreaseStockSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
     await decreaseStockProduct(String(req.params.id), parsed.data.qty, parsed.data.reason);
+    await audit(req, (req as any).user ?? null, 'product.decrease', 'product', String(req.params.id), parsed.data);
     res.json({ ok: true });
   })
 );
 
 app.get(
   '/api/products/:id/history',
+  requireRole(['owner']) as any,
   asyncHandler(async (req, res) => {
     res.json(await productStockHistory(String(req.params.id)));
   })
@@ -226,6 +396,7 @@ app.get(
 
 app.get(
   '/api/reports/inventory',
+  requireRole(['owner']) as any,
   asyncHandler(async (_req, res) => {
     res.json(await inventorySummary());
   })
@@ -233,6 +404,7 @@ app.get(
 
 app.get(
   '/api/reports/profit',
+  requireRole(['owner']) as any,
   asyncHandler(async (req, res) => {
     const p = (String(req.query.period ?? 'monthly') as any) ?? 'monthly';
     if (p !== 'daily' && p !== 'weekly' && p !== 'monthly') {
@@ -244,6 +416,7 @@ app.get(
 
 app.get(
   '/api/reports/top-products',
+  requireRole(['owner']) as any,
   asyncHandler(async (req, res) => {
     const p = (String(req.query.period ?? 'monthly') as any) ?? 'monthly';
     if (p !== 'daily' && p !== 'weekly' && p !== 'monthly') {
@@ -255,6 +428,7 @@ app.get(
 
 app.get(
   '/api/reports/customer-insights',
+  requireRole(['owner']) as any,
   asyncHandler(async (req, res) => {
     const p = (String(req.query.period ?? 'monthly') as any) ?? 'monthly';
     if (p !== 'daily' && p !== 'weekly' && p !== 'monthly') {
@@ -266,6 +440,7 @@ app.get(
 
 app.get(
   '/api/reports/low-stock',
+  requireRole(['owner']) as any,
   asyncHandler(async (_req, res) => {
     res.json(await lowStockReport());
   })
@@ -273,6 +448,7 @@ app.get(
 
 app.get(
   '/api/reports/inventory/pdf',
+  requireRole(['owner']) as any,
   asyncHandler(async (_req, res) => {
     const report = await inventorySummary();
     sendPdf(res, 'inventory-history.pdf', (doc) => {
@@ -305,11 +481,13 @@ app.get(
 // Sales / POS
 app.post(
   '/api/sales',
+  requireRole(['owner', 'cashier']) as any,
   asyncHandler(async (req, res) => {
     const parsed = CreateSaleSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
     try {
       const result = await createSale(parsed.data);
+      await audit(req, (req as any).user ?? null, 'sale.create', 'sale', String(result?.sale_id ?? ''), { receipt_ref: result?.receipt_ref });
       res.status(201).json(result);
     } catch (e: any) {
       res.status(400).json({ error: e?.message ?? 'Sale failed' });
@@ -319,6 +497,7 @@ app.post(
 
 app.get(
   '/api/sales/history',
+  requireRole(['owner', 'cashier']) as any,
   asyncHandler(async (req, res) => {
     const search = typeof req.query.search === 'string' ? req.query.search : undefined;
     res.json(await getSalesHistory({ search }));
@@ -327,6 +506,7 @@ app.get(
 
 app.get(
   '/api/sales/:receipt_ref',
+  requireRole(['owner', 'cashier']) as any,
   asyncHandler(async (req, res) => {
     const receipt_ref = String(req.params.receipt_ref);
     const sale = await getSaleByReceipt(receipt_ref);
@@ -337,17 +517,20 @@ app.get(
 
 app.post(
   '/api/sales/:receipt_ref/refund',
+  requireRole(['owner', 'cashier']) as any,
   asyncHandler(async (req, res) => {
     const parsed = RefundSaleSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
     const receipt_ref = String(req.params.receipt_ref);
     const result = await refundSaleByReceipt(receipt_ref, parsed.data);
+    await audit(req, (req as any).user ?? null, 'sale.refund', 'sale', receipt_ref, parsed.data);
     res.json(result);
   })
 );
 
 app.get(
   '/api/sales/:receipt_ref/pdf',
+  requireRole(['owner', 'cashier']) as any,
   asyncHandler(async (req, res) => {
     const receipt_ref = String(req.params.receipt_ref);
     const sale = await getSaleByReceipt(receipt_ref);

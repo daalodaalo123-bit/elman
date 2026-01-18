@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { TopNav } from './components/TopNav';
+import { RequireAuth } from './components/RequireAuth';
 import { DashboardPage } from './pages/DashboardPage';
 import { PosPage } from './pages/PosPage';
 import { InventoryPage } from './pages/InventoryPage';
@@ -7,6 +8,7 @@ import { ReportsPage } from './pages/ReportsPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { ExpensesPage } from './pages/ExpensesPage';
+import { LoginPage } from './pages/LoginPage';
 
 export default function App() {
   return (
@@ -14,13 +16,64 @@ export default function App() {
       <TopNav />
       <main className='mx-auto w-full max-w-[1200px] px-4 py-8'>
         <Routes>
-          <Route path='/dashboard' element={<DashboardPage />} />
-          <Route path='/' element={<PosPage />} />
-          <Route path='/inventory' element={<InventoryPage />} />
-          <Route path='/reports' element={<ReportsPage />} />
-          <Route path='/history' element={<HistoryPage />} />
-          <Route path='/customers' element={<CustomersPage />} />
-          <Route path='/expenses' element={<ExpensesPage />} />
+          <Route path='/login' element={<LoginPage />} />
+
+          <Route
+            path='/dashboard'
+            element={
+              <RequireAuth roles={['owner']}>
+                <DashboardPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path='/'
+            element={
+              <RequireAuth roles={['owner', 'cashier']}>
+                <PosPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path='/inventory'
+            element={
+              <RequireAuth roles={['owner']}>
+                <InventoryPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path='/reports'
+            element={
+              <RequireAuth roles={['owner']}>
+                <ReportsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path='/history'
+            element={
+              <RequireAuth roles={['owner', 'cashier']}>
+                <HistoryPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path='/customers'
+            element={
+              <RequireAuth roles={['owner']}>
+                <CustomersPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path='/expenses'
+            element={
+              <RequireAuth roles={['owner']}>
+                <ExpensesPage />
+              </RequireAuth>
+            }
+          />
           <Route path='*' element={<Navigate to='/' replace />} />
         </Routes>
       </main>

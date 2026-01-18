@@ -5,6 +5,7 @@ import { Card } from '../components/Card';
 import { money } from '../lib/format';
 import { CheckCircle2, ClipboardList, Printer, Plus, Save, User } from 'lucide-react';
 import { clsx } from 'clsx';
+import { apiPathWithToken } from '../lib/api';
 
 type CartItem = {
   product_id: string;
@@ -497,7 +498,7 @@ export function PosPage() {
               <div className='mt-4 flex flex-wrap gap-2'>
                 <a
                   className='inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50'
-                  href={`/api/sales/${lastReceipt}/pdf`}
+                  href={apiPathWithToken(`/api/sales/${lastReceipt}/pdf`)}
                   target='_blank'
                   rel='noreferrer'
                 >
