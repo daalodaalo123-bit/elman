@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { TopNav } from './components/TopNav';
+import { DashboardPage } from './pages/DashboardPage';
 import { PosPage } from './pages/PosPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { ReportsPage } from './pages/ReportsPage';
@@ -13,6 +14,7 @@ export default function App() {
       <TopNav />
       <main className='mx-auto w-full max-w-[1200px] px-4 py-8'>
         <Routes>
+          <Route path='/dashboard' element={<DashboardPage />} />
           <Route path='/' element={<PosPage />} />
           <Route path='/inventory' element={<InventoryPage />} />
           <Route path='/reports' element={<ReportsPage />} />

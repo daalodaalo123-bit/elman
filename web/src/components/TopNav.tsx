@@ -1,5 +1,15 @@
 ﻿import { NavLink } from 'react-router-dom';
-import { BarChart3, Boxes, History, LogOut, ShoppingCart, Store, Users, Receipt } from 'lucide-react';
+import {
+  BarChart3,
+  Boxes,
+  History,
+  LayoutDashboard,
+  LogOut,
+  Receipt,
+  ShoppingCart,
+  Store,
+  Users
+} from 'lucide-react';
 import { clsx } from 'clsx';
 
 function NavItem(props: {
@@ -37,10 +47,13 @@ export function TopNav() {
         </div>
 
         <nav className='hidden items-center gap-2 md:flex'>
+          <NavItem to='/dashboard' label='Dashboard' icon={<LayoutDashboard size={18} />} />
           <NavItem to='/' label='POS' icon={<ShoppingCart size={18} />} />
           <NavItem to='/inventory' label='Inventory' icon={<Boxes size={18} />} />
           <NavItem to='/reports' label='Reports' icon={<BarChart3 size={18} />} />
-          <NavItem to='/history' label='History' icon={<History size={18} />} />\n          <NavItem to='/customers' label='Customers' icon={<Users size={18} />} />\n          <NavItem to='/expenses' label='Expenses' icon={<Receipt size={18} />} />
+          <NavItem to='/history' label='History' icon={<History size={18} />} />
+          <NavItem to='/customers' label='Customers' icon={<Users size={18} />} />
+          <NavItem to='/expenses' label='Expenses' icon={<Receipt size={18} />} />
         </nav>
 
         <div className='flex items-center gap-3'>
