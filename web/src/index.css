@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.container-max {
+  max-width: 1200px;
+}
+
+@media print {
+  /* Hide app chrome */
+  header { display: none !important; }
+  .no-print { display: none !important; }
+
+  /* Remove backgrounds/shadows for paper */
+  body { background: white !important; }
+  .shadow-soft { box-shadow: none !important; }
+
+  /* Make modals printable */
+  .modal-overlay {
+    position: static !important;
+    inset: auto !important;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+  .modal-content {
+    width: auto !important;
+    max-width: none !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Ensure tables print nicely */
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; page-break-after: auto; }
+}

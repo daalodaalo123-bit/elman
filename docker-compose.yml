@@ -1,0 +1,15 @@
+version: '3.9'
+services:
+  postgres:
+    image: postgres:16
+    container_name: elman-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: elman
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - elman_pg_data:/var/lib/postgresql/data
+volumes:
+  elman_pg_data:

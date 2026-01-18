@@ -1,0 +1,81 @@
+import mongoose, { Schema } from 'mongoose';
+const CustomerSchema = new Schema({
+    name: { type: String, required: true, trim: true },
+    phone: { type: String },
+    email: { type: String },
+    address: { type: String },
+    notes: { type: String },
+    created_at: { type: Date, default: () => new Date() }
+}, { collection: 'customers' });
+CustomerSchema.index({ name: 1 });
+CustomerSchema.index({ phone: 1 });
+CustomerSchema.index({ email: 1 });
+export const Customer = mongoose.models.Customer ||
+    mongoose.model('Customer', CustomerSchema);
+const ProductSchema = new Schema({
+    name: { type: String, required: true, trim: true },
+    category: { type: String, required: true, trim: true },
+    price: { type: Number, required: true, min: 0 },
+    stock: { type: Number, required: true, min: 0, default: 0 },
+    low_stock_threshold: { type: Number, required: true, min: 0, default: 0 },
+    created_at: { type: Date, default: () => new Date() }
+}, { collection: 'products' });
+ProductSchema.index({ name: 1 });
+ProductSchema.index({ category: 1 });
+export const Product = mongoose.models.Product ||
+    mongoose.model('Product', ProductSchema);
+const InventoryLogSchema = new Schema({
+    product_id: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
+    product_name: { type: String, required: true },
+    change_type: { type: String, required: true },
+    qty_change: { type: Number, required: true },
+    reason: { type: String, required: true },
+    created_at: { type: Date, default: () => new Date() }
+}, { collection: 'inventory_log' });
+InventoryLogSchema.index({ created_at: -1 });
+InventoryLogSchema.index({ product_id: 1, created_at: -1 });
+export const InventoryLog = mongoose.models.InventoryLog ||
+    mongoose.model('InventoryLog', InventoryLogSchema);
+const SaleItemSchema = new Schema({
+    product_id: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
+    product_name: { type: String, required: true },
+    qty: { type: Number, required: true, min: 1 },
+    unit_price: { type: Number, required: true, min: 0 },
+    line_total: { type: Number, required: true, min: 0 }
+}, { _id: false });
+const SaleSchema = new Schema({
+    receipt_ref: { type: String, required: true, unique: true },
+    sale_date: { type: Date, default: () => new Date() },
+    cashier: { type: String, required: true },
+    customer: { type: String },
+    customer_id: { type: Schema.Types.ObjectId, ref: 'Customer' },
+    payment_method: { type: String, required: true },
+    subtotal: { type: Number, required: true, min: 0 },
+    discount: { type: Number, required: true, min: 0, default: 0 },
+    total: { type: Number, required: true, min: 0 },
+    unpaid: { type: Boolean, required: true, default: false },
+    items: { type: [SaleItemSchema], default: [] }
+}, { collection: 'sales' });
+SaleSchema.index({ sale_date: -1 });
+SaleSchema.index({ receipt_ref: 1 }, { unique: true });
+SaleSchema.index({ customer: 1 });
+export const Sale = mongoose.models.Sale || mongoose.model('Sale', SaleSchema);
+const ExpenseItemSchema = new Schema({
+    item_name: { type: String, required: true },
+    quantity: { type: Number, required: true, min: 0.0001, default: 1 },
+    unit_price: { type: Number, required: true, min: 0, default: 0 },
+    line_total: { type: Number, required: true, min: 0 }
+}, { _id: false });
+const ExpenseSchema = new Schema({
+    expense_date: { type: Date, default: () => new Date() },
+    category: { type: String, required: true },
+    vendor: { type: String },
+    notes: { type: String },
+    total_amount: { type: Number, required: true, min: 0 },
+    created_at: { type: Date, default: () => new Date() },
+    items: { type: [ExpenseItemSchema], default: [] }
+}, { collection: 'expenses' });
+ExpenseSchema.index({ expense_date: -1 });
+ExpenseSchema.index({ category: 1 });
+export const Expense = mongoose.models.Expense ||
+    mongoose.model('Expense', ExpenseSchema);
