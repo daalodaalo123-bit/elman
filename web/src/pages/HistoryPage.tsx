@@ -17,6 +17,18 @@ type RefundDraft = {
   }>;
 };
 
+function formatDateTime(v: string): string {
+  const d = new Date(v);
+  if (!Number.isFinite(d.getTime())) return v;
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(d);
+}
+
 export function HistoryPage() {
   const [rows, setRows] = useState<SalesHistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,7 +143,7 @@ export function HistoryPage() {
 
       <Card className='overflow-hidden'>
         <div className='overflow-x-auto'>
-          <table className='w-full text-left text-sm'>
+          <table className='w-full min-w-[1050px] text-left text-sm'>
             <thead className='bg-white'>
               <tr className='border-b border-slate-200 text-slate-600'>
                 <th className='px-5 py-4 font-medium'>Receipt Ref</th>
@@ -169,7 +181,7 @@ export function HistoryPage() {
                         </span>
                       ) : null}
                     </td>
-                    <td className='px-5 py-4 text-slate-600'>{String(r.date)}</td>
+                    <td className='px-5 py-4 text-slate-600 whitespace-nowrap'>{formatDateTime(String(r.date))}</td>
                     <td className='px-5 py-4 text-slate-600'>{r.cashier}</td>
                     <td className='px-5 py-4 text-slate-600'>{r.customer ?? 'â€”'}</td>
                     <td className='px-5 py-4 text-slate-600'>{r.payment}</td>
@@ -185,7 +197,7 @@ export function HistoryPage() {
                         </span>
                       )}
                     </td>
-                    <td className='px-5 py-4'>
+                    <td className='px-5 py-4 whitespace-nowrap align-top'>
                       <button
                         type='button'
                         onClick={() => openRefund(r.receipt_ref)}
@@ -199,9 +211,9 @@ export function HistoryPage() {
                         </div>
                       ) : null}
                     </td>
-                    <td className='px-5 py-4'>
+                    <td className='px-5 py-4 whitespace-nowrap align-top'>
                       <a
-                        className='rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50'
+                        className='inline-flex rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50'
                         href={`/api/sales/${r.receipt_ref}/pdf`}
                       >
                         Download Receipt
