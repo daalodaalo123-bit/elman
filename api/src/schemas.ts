@@ -55,6 +55,19 @@ export const CreateSaleSchema = z.object({
     .min(1)
 });
 
+export const RefundSaleSchema = z.object({
+  cashier: z.string().min(1).default('Main Cashier'),
+  reason: z.string().min(1).default('Refund'),
+  items: z
+    .array(
+      z.object({
+        product_id: z.string().min(1),
+        qty: z.number().int().positive()
+      })
+    )
+    .min(1)
+});
+
 export const ExpenseCategorySchema = z.enum([
   'Inventory Purchase',
   'Vendor Bill',

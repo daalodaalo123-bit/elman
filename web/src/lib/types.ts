@@ -74,7 +74,7 @@ export type LowStockReport = {
 
 export type ProductHistoryRow = {
   date: string;
-  change_type: 'SALE' | 'RESTOCK' | 'ADJUSTMENT';
+  change_type: 'SALE' | 'RESTOCK' | 'ADJUSTMENT' | 'REFUND';
   qty_change: number;
   reason: string;
 };
@@ -111,6 +111,30 @@ export type SalesHistoryRow = {
   payment: PaymentMethod;
   total: number;
   unpaid: 0 | 1;
+  refunded_total?: number;
+  fully_refunded?: boolean;
+};
+
+export type SaleDetail = {
+  id: string;
+  receipt_ref: string;
+  sale_date: string;
+  cashier: string;
+  customer: string | null;
+  payment_method: PaymentMethod;
+  subtotal: number;
+  discount: number;
+  total: number;
+  unpaid: boolean;
+  refunded_total: number;
+  fully_refunded: boolean;
+  items: Array<{
+    product_id: string;
+    product_name: string;
+    qty: number;
+    unit_price: number;
+    line_total: number;
+  }>;
 };
 
 export type ExpenseCategory = 'Inventory Purchase' | 'Vendor Bill' | 'Electricity' | 'Rent' | 'Other';

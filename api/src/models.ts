@@ -63,7 +63,7 @@ export const Product =
 export type InventoryLogDoc = {
   product_id: mongoose.Types.ObjectId;
   product_name: string;
-  change_type: 'SALE' | 'RESTOCK' | 'ADJUSTMENT';
+  change_type: 'SALE' | 'RESTOCK' | 'ADJUSTMENT' | 'REFUND';
   qty_change: number;
   reason: string;
   created_at: Date;
@@ -117,6 +117,8 @@ export type SaleDoc = {
   discount: number;
   total: number;
   unpaid: boolean;
+  refunded_total: number;
+  fully_refunded: boolean;
   items: SaleItem[];
 };
 
@@ -132,6 +134,8 @@ const SaleSchema = new Schema<SaleDoc>(
     discount: { type: Number, required: true, min: 0, default: 0 },
     total: { type: Number, required: true, min: 0 },
     unpaid: { type: Boolean, required: true, default: false },
+    refunded_total: { type: Number, required: true, min: 0, default: 0 },
+    fully_refunded: { type: Boolean, required: true, default: false },
     items: { type: [SaleItemSchema], default: [] }
   },
   { collection: 'sales' }
@@ -142,6 +146,53 @@ SaleSchema.index({ customer: 1 });
 
 export const Sale =
   (mongoose.models.Sale as mongoose.Model<SaleDoc>) || mongoose.model<SaleDoc>('Sale', SaleSchema);
+
+export type RefundItem = {
+  product_id: mongoose.Types.ObjectId;
+  product_name: string;
+  qty: number;
+  unit_price: number;
+  line_total: number;
+};
+
+const RefundItemSchema = new Schema<RefundItem>(
+  {
+    product_id: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
+    product_name: { type: String, required: true },
+    qty: { type: Number, required: true, min: 1 },
+    unit_price: { type: Number, required: true, min: 0 },
+    line_total: { type: Number, required: true, min: 0 }
+  },
+  { _id: false }
+);
+
+export type RefundDoc = {
+  sale_id: mongoose.Types.ObjectId;
+  receipt_ref: string;
+  refund_date: Date;
+  cashier: string;
+  reason: string;
+  total_refund: number;
+  items: RefundItem[];
+};
+
+const RefundSchema = new Schema<RefundDoc>(
+  {
+    sale_id: { type: Schema.Types.ObjectId, ref: 'Sale', required: true },
+    receipt_ref: { type: String, required: true },
+    refund_date: { type: Date, default: () => new Date() },
+    cashier: { type: String, required: true },
+    reason: { type: String, required: true },
+    total_refund: { type: Number, required: true, min: 0 },
+    items: { type: [RefundItemSchema], default: [] }
+  },
+  { collection: 'refunds' }
+);
+RefundSchema.index({ receipt_ref: 1, refund_date: -1 });
+
+export const Refund =
+  (mongoose.models.Refund as mongoose.Model<RefundDoc>) ||
+  mongoose.model<RefundDoc>('Refund', RefundSchema);
 
 export type ExpenseItem = {
   item_name: string;

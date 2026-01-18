@@ -11,6 +11,7 @@ import {
   CreateProductSchema,
   CreateSaleSchema,
   DecreaseStockSchema,
+  RefundSaleSchema,
   RestockSchema,
   UpdateCustomerSchema,
   UpdateProductSchema
@@ -24,7 +25,13 @@ import {
   restockProduct,
   updateProduct
 } from './inventory.js';
-import { createSale, getSaleByReceipt, getSalesHistory, salesReport } from './sales.js';
+import {
+  createSale,
+  getSaleByReceipt,
+  getSalesHistory,
+  refundSaleByReceipt,
+  salesReport
+} from './sales.js';
 import { createCustomer, listCustomers, updateCustomer } from './customers.js';
 import { createExpense, getExpense, listExpenses } from './expenses.js';
 import { sendPdf, hr, kv, money, tableHeader, tableRow, title } from './pdf.js';
@@ -315,6 +322,27 @@ app.get(
   asyncHandler(async (req, res) => {
     const search = typeof req.query.search === 'string' ? req.query.search : undefined;
     res.json(await getSalesHistory({ search }));
+  })
+);
+
+app.get(
+  '/api/sales/:receipt_ref',
+  asyncHandler(async (req, res) => {
+    const receipt_ref = String(req.params.receipt_ref);
+    const sale = await getSaleByReceipt(receipt_ref);
+    if (!sale) return res.status(404).json({ error: 'Not found' });
+    res.json(sale);
+  })
+);
+
+app.post(
+  '/api/sales/:receipt_ref/refund',
+  asyncHandler(async (req, res) => {
+    const parsed = RefundSaleSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+    const receipt_ref = String(req.params.receipt_ref);
+    const result = await refundSaleByReceipt(receipt_ref, parsed.data);
+    res.json(result);
   })
 );
 

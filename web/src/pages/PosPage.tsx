@@ -3,7 +3,7 @@ import { api } from '../lib/api';
 import type { Customer, PaymentMethod, Product } from '../lib/types';
 import { Card } from '../components/Card';
 import { money } from '../lib/format';
-import { CheckCircle2, Plus, User } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Printer, Plus, Save, User } from 'lucide-react';
 import { clsx } from 'clsx';
 
 type CartItem = {
@@ -12,6 +12,23 @@ type CartItem = {
   unit_price: number;
   qty: number;
 };
+
+type DiscountMode = 'amount' | 'percent';
+
+type ParkedCart = {
+  id: string;
+  name: string;
+  saved_at: string;
+  cart: CartItem[];
+  discount: number;
+  discountMode: DiscountMode;
+  payment: PaymentMethod;
+  saleDate: string;
+  customerId: string;
+  customerName: string;
+};
+
+const PARKED_KEY = 'elman_pos_parked_carts_v1';
 
 function nowForDateTimeLocal(): string {
   const d = new Date();
@@ -32,8 +49,11 @@ export function PosPage() {
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState<number>(0);
+  const [discountMode, setDiscountMode] = useState<DiscountMode>('amount');
   const [payment, setPayment] = useState<PaymentMethod>('Cash');
   const [submitting, setSubmitting] = useState(false);
+  const [lastReceipt, setLastReceipt] = useState<string | null>(null);
+  const [parked, setParked] = useState<ParkedCart[]>([]);
 
   // Sale date (can be past/future)
   const [saleDate, setSaleDate] = useState<string>(() => nowForDateTimeLocal());
@@ -73,9 +93,19 @@ export function PosPage() {
 
   const subtotal = useMemo(() => cart.reduce((s, it) => s + it.unit_price * it.qty, 0), [cart]);
 
+  const discountAmount = useMemo(() => {
+    const d = Number(discount || 0);
+    if (!Number.isFinite(d) || d <= 0) return 0;
+    if (discountMode === 'percent') {
+      const pct = Math.min(100, Math.max(0, d));
+      return (subtotal * pct) / 100;
+    }
+    return d;
+  }, [discount, discountMode, subtotal]);
+
   const total = useMemo(
-    () => Math.max(0, subtotal - (Number.isFinite(discount) ? discount : 0)),
-    [subtotal, discount]
+    () => Math.max(0, subtotal - discountAmount),
+    [subtotal, discountAmount]
   );
 
   const selectedCustomer = useMemo(
@@ -88,6 +118,72 @@ export function PosPage() {
       setCustomerName(selectedCustomer.name);
     }
   }, [selectedCustomer]);
+
+  useEffect(() => {
+    // load parked carts
+    try {
+      const raw = localStorage.getItem(PARKED_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as ParkedCart[];
+      if (Array.isArray(parsed)) setParked(parsed);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  function persistParked(next: ParkedCart[]) {
+    setParked(next);
+    try {
+      localStorage.setItem(PARKED_KEY, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+  }
+
+  function parkCart() {
+    if (!cart.length) return;
+    const name = prompt('Name this parked cart (optional):', customerName.trim() || 'Parked cart');
+    const id = `${Date.now()}`;
+    const item: ParkedCart = {
+      id,
+      name: (name ?? '').trim() || 'Parked cart',
+      saved_at: new Date().toISOString(),
+      cart,
+      discount,
+      discountMode,
+      payment,
+      saleDate,
+      customerId,
+      customerName
+    };
+    const next = [item, ...parked].slice(0, 20);
+    persistParked(next);
+    // clear current
+    setCart([]);
+    setDiscount(0);
+    setDiscountMode('amount');
+    setCustomerId('');
+    setCustomerName('');
+    setLastReceipt(null);
+  }
+
+  function resumeCart(id: string) {
+    const found = parked.find((p) => p.id === id);
+    if (!found) return;
+    setCart(found.cart);
+    setDiscount(found.discount);
+    setDiscountMode(found.discountMode);
+    setPayment(found.payment);
+    setSaleDate(found.saleDate);
+    setCustomerId(found.customerId);
+    setCustomerName(found.customerName);
+    setLastReceipt(null);
+    persistParked(parked.filter((p) => p.id !== id));
+  }
+
+  function deleteParked(id: string) {
+    persistParked(parked.filter((p) => p.id !== id));
+  }
 
   function addToCart() {
     if (!selectedProduct) return;
@@ -121,13 +217,14 @@ export function PosPage() {
         customer: customerName.trim() ? customerName.trim() : undefined,
         customer_id: customerId ? customerId : undefined,
         payment_method: payment,
-        discount: discount || 0,
+        discount: Number(discountAmount || 0),
         unpaid: false,
         items: cart.map((c) => ({ product_id: c.product_id, qty: c.qty }))
       });
-      alert(`Sale completed. Receipt: ${res.receipt_ref}`);
+      setLastReceipt(res.receipt_ref);
       setCart([]);
       setDiscount(0);
+      setDiscountMode('amount');
       setCustomerId('');
       setCustomerName('');
     } catch (e: any) {
@@ -263,6 +360,64 @@ export function PosPage() {
               </div>
             </div>
 
+            <div className='mt-3 flex flex-wrap items-center justify-between gap-3'>
+              <div className='text-xs text-slate-500'>
+                {parked.length ? `${parked.length} parked` : 'No parked carts'}
+              </div>
+              <div className='flex items-center gap-2'>
+                <button
+                  type='button'
+                  onClick={parkCart}
+                  disabled={!cart.length}
+                  className='inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50'
+                >
+                  <Save size={16} />
+                  Park cart
+                </button>
+              </div>
+            </div>
+
+            {parked.length ? (
+              <div className='mt-4 overflow-hidden rounded-xl border border-slate-200'>
+                <table className='w-full text-left text-sm'>
+                  <thead className='bg-slate-50 text-slate-600'>
+                    <tr>
+                      <th className='px-4 py-3 font-medium'>Parked carts</th>
+                      <th className='px-4 py-3 font-medium'>Items</th>
+                      <th className='px-4 py-3 font-medium'></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parked.slice(0, 5).map((p) => (
+                      <tr key={p.id} className='border-t border-slate-200'>
+                        <td className='px-4 py-3 font-medium text-slate-900'>{p.name}</td>
+                        <td className='px-4 py-3 text-slate-600'>{p.cart.length}</td>
+                        <td className='px-4 py-3'>
+                          <div className='flex items-center justify-end gap-2'>
+                            <button
+                              type='button'
+                              onClick={() => resumeCart(p.id)}
+                              className='inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50'
+                            >
+                              <ClipboardList size={16} />
+                              Resume
+                            </button>
+                            <button
+                              type='button'
+                              onClick={() => deleteParked(p.id)}
+                              className='rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 shadow-sm hover:bg-red-50'
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+
             <div className='mt-4 overflow-hidden rounded-xl border border-slate-200'>
               <table className='w-full text-left text-sm'>
                 <thead className='bg-slate-50 text-slate-600'>
@@ -309,7 +464,14 @@ export function PosPage() {
             <div className='mt-4 flex items-center justify-between gap-3'>
               <div className='text-sm text-slate-300'>Discount</div>
               <div className='flex items-center gap-2 rounded-xl bg-slate-800 px-3 py-2'>
-                <span className='text-slate-300'>$</span>
+                <button
+                  type='button'
+                  onClick={() => setDiscountMode(discountMode === 'amount' ? 'percent' : 'amount')}
+                  className='rounded-lg bg-slate-700 px-2 py-1 text-xs font-bold text-white'
+                  title='Toggle discount type'
+                >
+                  {discountMode === 'amount' ? '$' : '%'}
+                </button>
                 <input
                   type='number'
                   min={0}
@@ -327,6 +489,24 @@ export function PosPage() {
               </div>
             </div>
           </div>
+
+          {lastReceipt ? (
+            <Card className='mt-6 p-6'>
+              <div className='text-lg font-bold'>Last sale</div>
+              <div className='mt-1 text-sm text-slate-600'>Receipt: {lastReceipt}</div>
+              <div className='mt-4 flex flex-wrap gap-2'>
+                <a
+                  className='inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50'
+                  href={`/api/sales/${lastReceipt}/pdf`}
+                  target='_blank'
+                  rel='noreferrer'
+                >
+                  <Printer size={16} />
+                  Print / PDF
+                </a>
+              </div>
+            </Card>
+          ) : null}
 
           <Card className='mt-6 p-6'>
             <div className='text-lg font-bold'>Payment Method</div>
