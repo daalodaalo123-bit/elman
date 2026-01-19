@@ -98,6 +98,42 @@ app.post(
   })
 );
 
+// Admin password reset (protected by BOOTSTRAP_SECRET)
+// Use when the instance is already bootstrapped but you lost the password.
+app.post(
+  '/api/auth/reset-password',
+  asyncHandler(async (req, res) => {
+    const secret = process.env.BOOTSTRAP_SECRET?.trim();
+    if (!secret) return res.status(500).json({ error: 'BOOTSTRAP_SECRET is not set on server' });
+    const provided = String(req.headers['x-bootstrap-secret'] ?? '').trim();
+    if (provided !== secret) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const schema = z.object({
+      username: z.string().min(1),
+      new_password: z.string().min(6)
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+    const username = parsed.data.username.trim();
+    const password_hash = await hashPassword(parsed.data.new_password);
+    const result = await User.updateOne({ username }, { $set: { password_hash } });
+    if (!result.matchedCount) return res.status(404).json({ error: 'User not found' });
+
+    await audit(
+      req,
+      null,
+      'auth.reset_password',
+      'user',
+      username,
+      { username, password: '***' }
+    );
+    res.json({ ok: true });
+  })
+);
+
 app.post(
   '/api/auth/login',
   asyncHandler(async (req, res) => {

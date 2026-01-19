@@ -36,6 +36,16 @@ curl -X POST http://localhost:5050/api/auth/bootstrap ^
 
 Then login at `http://localhost:5173/login`.
 
+### If you forgot the password (already bootstrapped)
+Use the admin reset endpoint (protected by `BOOTSTRAP_SECRET`):
+
+```bash
+curl -X POST http://localhost:5050/api/auth/reset-password ^
+  -H "Content-Type: application/json" ^
+  -H "x-bootstrap-secret: <BOOTSTRAP_SECRET>" ^
+  -d "{\"username\":\"owner\",\"new_password\":\"ownerpass123\"}"
+```
+
 ### (Old) Local setup (PostgreSQL)
 This section is outdated; the current backend uses MongoDB.
 
@@ -89,4 +99,13 @@ curl -X POST https://<your-service>.onrender.com/api/auth/bootstrap \
   -H "Content-Type: application/json" \
   -H "x-bootstrap-secret: <BOOTSTRAP_SECRET>" \
   -d "{\"username\":\"owner\",\"password\":\"ownerpass123\"}"
+```
+
+If production is already bootstrapped and you need to reset the password:
+
+```bash
+curl -X POST https://<your-service>.onrender.com/api/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -H "x-bootstrap-secret: <BOOTSTRAP_SECRET>" \
+  -d "{\"username\":\"owner\",\"new_password\":\"ownerpass123\"}"
 ```
