@@ -14,10 +14,10 @@ function loadEnv() {
     ];
     const envPath = candidates.find((p) => fs.existsSync(p));
     if (envPath) {
-        dotenv.config({ path: envPath });
+        dotenv.config({ path: envPath, override: true });
     }
     else {
-        dotenv.config();
+        dotenv.config({ override: true });
     }
 }
 loadEnv();

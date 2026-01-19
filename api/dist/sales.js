@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { Customer, InventoryLog, Product, Sale } from './models.js';
+import { Customer, InventoryLog, Product, Refund, Sale } from './models.js';
 import { makeReceiptRef } from './utils.js';
 async function resolveCustomerName(customer_id, customer) {
     if (customer_id) {
@@ -92,7 +92,7 @@ export async function getSalesHistory(queryArg) {
     const rows = await Sale.find(filter)
         .sort({ sale_date: -1 })
         .limit(200)
-        .select('receipt_ref sale_date cashier customer payment_method total unpaid')
+        .select('receipt_ref sale_date cashier customer payment_method total unpaid refunded_total fully_refunded')
         .lean();
     return rows.map((s) => ({
         receipt_ref: s.receipt_ref,
@@ -101,6 +101,8 @@ export async function getSalesHistory(queryArg) {
         customer: s.customer ?? null,
         payment: s.payment_method,
         total: s.total,
+        refunded_total: Number(s.refunded_total ?? 0),
+        fully_refunded: Boolean(s.fully_refunded),
         unpaid: s.unpaid ? 1 : 0
     }));
 }
@@ -118,14 +120,106 @@ export async function getSaleByReceipt(receipt_ref) {
         subtotal: sale.subtotal,
         discount: sale.discount,
         total: sale.total,
+        refunded_total: Number(sale.refunded_total ?? 0),
+        fully_refunded: Boolean(sale.fully_refunded),
         unpaid: sale.unpaid,
         items: (sale.items ?? []).map((it) => ({
+            product_id: String(it.product_id),
             product_name: it.product_name,
             qty: it.qty,
             unit_price: it.unit_price,
             line_total: it.line_total
         }))
     };
+}
+export async function refundSaleByReceipt(receipt_ref, input) {
+    const session = await mongoose.startSession();
+    try {
+        let result;
+        await session.withTransaction(async () => {
+            const sale = await Sale.findOne({ receipt_ref }).session(session);
+            if (!sale)
+                throw new Error('Sale not found');
+            // Build sold quantities
+            const soldByProduct = new Map();
+            for (const it of sale.items ?? []) {
+                const key = String(it.product_id);
+                soldByProduct.set(key, {
+                    product_id: it.product_id,
+                    product_name: it.product_name,
+                    qty: Number(it.qty ?? 0),
+                    unit_price: Number(it.unit_price ?? 0)
+                });
+            }
+            // Compute already-refunded quantities per product for this receipt
+            const refundedAgg = await Refund.aggregate([
+                { $match: { receipt_ref } },
+                { $unwind: '$items' },
+                { $group: { _id: '$items.product_id', qty: { $sum: '$items.qty' } } }
+            ]).session(session);
+            const alreadyRefunded = new Map();
+            for (const r of refundedAgg) {
+                alreadyRefunded.set(String(r._id), Number(r.qty ?? 0));
+            }
+            const refundItems = [];
+            let total_refund = 0;
+            for (const req of input.items ?? []) {
+                const key = String(req.product_id);
+                const sold = soldByProduct.get(key);
+                if (!sold)
+                    throw new Error(`Item not found on sale: ${key}`);
+                const requestedQty = Math.max(1, Math.floor(Number(req.qty ?? 1)));
+                const prevRefunded = alreadyRefunded.get(key) ?? 0;
+                const refundable = Math.max(0, sold.qty - prevRefunded);
+                if (requestedQty > refundable) {
+                    throw new Error(`Refund qty too high for ${sold.product_name}. Max refundable: ${refundable}`);
+                }
+                const unit_price = sold.unit_price;
+                const line_total = unit_price * requestedQty;
+                total_refund += line_total;
+                // Restore stock
+                await Product.updateOne({ _id: sold.product_id }, { $inc: { stock: requestedQty } }).session(session);
+                await InventoryLog.create([
+                    {
+                        product_id: sold.product_id,
+                        product_name: sold.product_name,
+                        change_type: 'REFUND',
+                        qty_change: requestedQty,
+                        reason: `${input.reason ?? 'Refund'} (${receipt_ref})`
+                    }
+                ], { session });
+                refundItems.push({
+                    product_id: sold.product_id,
+                    product_name: sold.product_name,
+                    qty: requestedQty,
+                    unit_price,
+                    line_total
+                });
+            }
+            total_refund = Number(total_refund.toFixed(2));
+            await Refund.create([
+                {
+                    sale_id: sale._id,
+                    receipt_ref,
+                    refund_date: new Date(),
+                    cashier: input.cashier,
+                    reason: input.reason,
+                    total_refund,
+                    items: refundItems
+                }
+            ], { session });
+            // Update sale refund totals
+            const newRefundedTotal = Number((Number(sale.refunded_total ?? 0) + total_refund).toFixed(2));
+            sale.refunded_total = newRefundedTotal;
+            sale.fully_refunded = newRefundedTotal >= Number(sale.total ?? 0);
+            await sale.save({ session });
+            result = { ok: true, receipt_ref, total_refund, refunded_total: newRefundedTotal, fully_refunded: sale.fully_refunded };
+        });
+        return result;
+    }
+    finally {
+        await session.endSession();
+    }
 }
 export async function salesReport(period) {
     const now = new Date();

@@ -46,7 +46,8 @@ import {
 } from './reports.js';
 import { AuditLog, User } from './models.js';
 
-dotenv.config();
+// Ensure local `api/.env` reliably overrides any pre-existing environment variables (Windows often has stale env)
+dotenv.config({ override: true });
 
 const app = express();
 
@@ -73,9 +74,10 @@ app.use(
 app.post(
   '/api/auth/bootstrap',
   asyncHandler(async (req, res) => {
-    const secret = process.env.BOOTSTRAP_SECRET;
+    const secret = process.env.BOOTSTRAP_SECRET?.trim();
     if (!secret) return res.status(500).json({ error: 'BOOTSTRAP_SECRET is not set on server' });
-    if (String(req.headers['x-bootstrap-secret'] ?? '') !== secret) {
+    const provided = String(req.headers['x-bootstrap-secret'] ?? '').trim();
+    if (provided !== secret) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
