@@ -30,13 +30,47 @@ let connecting: Promise<void> | null = null;
 // Fail fast instead of buffering commands for 10s
 mongoose.set('bufferCommands', false);
 
+function normalizeMongoUri(raw: string): string {
+  let uri = String(raw ?? '').trim();
+
+  // Common mistake in Render env vars: pasting the whole "MONGODB_URI=..." line into the value field
+  if (uri.toUpperCase().startsWith('MONGODB_URI=')) {
+    uri = uri.slice('MONGODB_URI='.length).trim();
+  }
+
+  // Strip surrounding quotes if present
+  if (
+    (uri.startsWith('"') && uri.endsWith('"') && uri.length >= 2) ||
+    (uri.startsWith("'") && uri.endsWith("'") && uri.length >= 2)
+  ) {
+    uri = uri.slice(1, -1).trim();
+  }
+
+  // Placeholder check (Atlas "copy/paste" template not filled)
+  if (uri.includes('<db_password>') || uri.includes('<password>') || uri.includes('<username>')) {
+    throw new Error(
+      'MONGODB_URI contains placeholders (e.g. <username>/<db_password>). Replace them with your real Atlas DB username/password.'
+    );
+  }
+
+  // Must be a valid Mongo connection string scheme
+  if (!(uri.startsWith('mongodb://') || uri.startsWith('mongodb+srv://'))) {
+    throw new Error(
+      'Invalid MONGODB_URI. It must start with "mongodb://" or "mongodb+srv://". (If deploying on Render, paste only the URI value, not "MONGODB_URI=").'
+    );
+  }
+
+  return uri;
+}
+
 export async function connectDb(): Promise<void> {
-  const uri = process.env.MONGODB_URI;
-  if (!uri) {
+  const raw = process.env.MONGODB_URI;
+  if (!raw) {
     throw new Error(
       'MONGODB_URI is not set. Create api/.env with MONGODB_URI (MongoDB Atlas connection string).'
     );
   }
+  const uri = normalizeMongoUri(raw);
 
   if (mongoose.connection.readyState === 1) return;
   if (connecting) return connecting;

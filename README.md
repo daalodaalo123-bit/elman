@@ -70,7 +70,23 @@ Open: `http://localhost:5050`
 
 ### Render deployment
 
-- Create Render PostgreSQL
-- Set `DATABASE_URL` in the Web Service env vars
-- Run one-time: `npm run db:init` (Render Shell)
-- Optional: `npm run db:seed`
+This backend uses **MongoDB** (Atlas recommended).
+
+- Create a Render **Web Service** for the `api` (or a single service that serves both API + built web).
+- Set these env vars on the Render service:
+  - `MONGODB_URI`: paste **only the URI value** (must start with `mongodb://` or `mongodb+srv://`)
+  - `JWT_SECRET`
+  - `BOOTSTRAP_SECRET`
+  - `NODE_ENV=production`
+- MongoDB Atlas:
+  - Ensure the DB user/password in `MONGODB_URI` are correct
+  - Ensure **Network Access** allows Render’s IPs (for quick testing you can allow `0.0.0.0/0`, then tighten later)
+
+Bootstrap the first owner user once (use your Render service URL):
+
+```bash
+curl -X POST https://<your-service>.onrender.com/api/auth/bootstrap \
+  -H "Content-Type: application/json" \
+  -H "x-bootstrap-secret: <BOOTSTRAP_SECRET>" \
+  -d "{\"username\":\"owner\",\"password\":\"ownerpass123\"}"
+```

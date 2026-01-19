@@ -380,10 +380,29 @@ app.get('/api/reports/sales', asyncHandler(async (req, res) => {
 // Express error handler
 app.use((err, _req, res, _next) => {
     console.error(err);
-    const msg = err && typeof err.message === 'string' && err.message.trim()
-        ? err.message
+    const rawMsg = err && typeof err.message === 'string' && err.message.trim()
+        ? err.message.trim()
         : String(err ?? 'Server error');
-    res.status(500).json({ error: msg });
+    // If the DB is misconfigured/unreachable, return a safe + actionable message (and avoid leaking raw DB errors)
+    const lower = rawMsg.toLowerCase();
+    const isDbAuth = lower.includes('authentication failed') ||
+        lower.includes('bad auth') ||
+        err?.codeName === 'AtlasError' ||
+        err?.name === 'MongoServerError';
+    const isDbConn = isDbAuth ||
+        lower.includes('mongoparseerror') ||
+        lower.includes('mongoose') ||
+        lower.includes('mongodb_uri') ||
+        lower.includes('server selection') ||
+        lower.includes('ecconnrefused') ||
+        lower.includes('timed out') ||
+        lower.includes('failed to connect to mongodb');
+    if (isDbConn) {
+        return res.status(503).json({
+            error: 'Database connection failed. Check server env MONGODB_URI (Atlas username/password, IP allowlist, and that you pasted only the URI value).'
+        });
+    }
+    res.status(500).json({ error: rawMsg });
 });
 // --- Serve the React web app in production ---
 const webDist = path.resolve(process.cwd(), '..', 'web', 'dist');
