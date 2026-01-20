@@ -19,7 +19,9 @@ export function LoginPage() {
       await login(username.trim(), password);
       nav('/', { replace: true });
     } catch (e: any) {
-      alert(e?.message ?? 'Login failed');
+      const errorMessage = e?.message || 'Login failed. Please check your username and password.';
+      alert(errorMessage);
+      console.error('Login error:', e);
     } finally {
       setSubmitting(false);
     }

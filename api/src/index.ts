@@ -142,7 +142,11 @@ app.post(
       password: z.string().min(1)
     });
     const parsed = schema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+    if (!parsed.success) {
+      const errors = parsed.error.flatten().fieldErrors;
+      const errorMsg = Object.values(errors).flat().join(', ') || 'Invalid input';
+      return res.status(400).json({ error: errorMsg });
+    }
 
     const u = await findUserByUsername(parsed.data.username.trim());
     if (!u) return res.status(401).json({ error: 'Invalid username or password' });
