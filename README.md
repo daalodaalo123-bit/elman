@@ -37,6 +37,18 @@ curl -X POST http://localhost:5050/api/auth/bootstrap ^
 Then login at `http://localhost:5173/login`.
 
 ### If you forgot the password (already bootstrapped)
+
+**Option 1: Using the helper script (recommended)**
+
+Make sure the API server is running, then:
+
+```bash
+cd api
+npm run reset-password owner newpassword123
+```
+
+**Option 2: Using curl**
+
 Use the admin reset endpoint (protected by `BOOTSTRAP_SECRET`):
 
 ```bash
@@ -45,6 +57,8 @@ curl -X POST http://localhost:5050/api/auth/reset-password ^
   -H "x-bootstrap-secret: <BOOTSTRAP_SECRET>" ^
   -d "{\"username\":\"owner\",\"new_password\":\"ownerpass123\"}"
 ```
+
+**Note:** Make sure your `api/.env` file has the correct `BOOTSTRAP_SECRET` value.
 
 ### (Old) Local setup (PostgreSQL)
 This section is outdated; the current backend uses MongoDB.
