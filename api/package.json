@@ -7,7 +7,9 @@
         "build": "tsc",
         "start": "node dist/index.js",
         "db:init": "tsx src/db/initDb.ts",
-        "db:seed": "tsx src/db/seed.ts"
+        "db:seed": "tsx src/db/seed.ts",
+        "bootstrap": "node bootstrap-user.js bootstrap",
+        "reset-password": "node bootstrap-user.js reset"
     },
     "dependencies": {
         "bcryptjs": "^2.4.3",
