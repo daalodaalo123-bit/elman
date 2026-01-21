@@ -20,6 +20,7 @@ import {
   UpdateProductSchema
 } from './schemas.js';
 import {
+  archiveProduct,
   createProduct,
   decreaseStockProduct,
   inventorySummary,
@@ -401,6 +402,20 @@ app.put(
     await updateProduct(String(req.params.id), parsed.data);
     await audit(req, (req as any).user ?? null, 'product.update', 'product', String(req.params.id), parsed.data);
     res.json({ ok: true });
+  })
+);
+
+app.delete(
+  '/api/products/:id',
+  requireRole(['owner']) as any,
+  asyncHandler(async (req, res) => {
+    try {
+      await archiveProduct(String(req.params.id));
+      await audit(req, (req as any).user ?? null, 'product.archive', 'product', String(req.params.id));
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(400).json({ error: e?.message ?? 'Failed to remove product' });
+    }
   })
 );
 

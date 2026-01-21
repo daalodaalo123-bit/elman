@@ -20,11 +20,14 @@ const ProductSchema = new Schema({
     unit_cost: { type: Number, required: true, min: 0, default: 0 },
     stock: { type: Number, required: true, min: 0, default: 0 },
     low_stock_threshold: { type: Number, required: true, min: 0, default: 0 },
+    archived: { type: Boolean, required: true, default: false },
+    archived_at: { type: Date },
     created_at: { type: Date, default: () => new Date() }
 }, { collection: 'products' });
 ProductSchema.index({ name: 1 });
 ProductSchema.index({ category: 1 });
 ProductSchema.index({ sku: 1 }, { unique: true, sparse: true });
+ProductSchema.index({ archived: 1, name: 1 });
 export const Product = mongoose.models.Product ||
     mongoose.model('Product', ProductSchema);
 const InventoryLogSchema = new Schema({

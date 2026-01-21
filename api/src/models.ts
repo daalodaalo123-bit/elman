@@ -36,6 +36,8 @@ export type ProductDoc = {
   unit_cost: number;
   stock: number;
   low_stock_threshold: number;
+  archived: boolean;
+  archived_at?: Date;
   created_at: Date;
 };
 
@@ -48,6 +50,8 @@ const ProductSchema = new Schema<ProductDoc>(
     unit_cost: { type: Number, required: true, min: 0, default: 0 },
     stock: { type: Number, required: true, min: 0, default: 0 },
     low_stock_threshold: { type: Number, required: true, min: 0, default: 0 },
+    archived: { type: Boolean, required: true, default: false },
+    archived_at: { type: Date },
     created_at: { type: Date, default: () => new Date() }
   },
   { collection: 'products' }
@@ -55,6 +59,7 @@ const ProductSchema = new Schema<ProductDoc>(
 ProductSchema.index({ name: 1 });
 ProductSchema.index({ category: 1 });
 ProductSchema.index({ sku: 1 }, { unique: true, sparse: true });
+ProductSchema.index({ archived: 1, name: 1 });
 
 export const Product =
   (mongoose.models.Product as mongoose.Model<ProductDoc>) ||

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { History, Pencil, X } from 'lucide-react';
+import { History, Pencil, Trash2, X } from 'lucide-react';
 import { Card } from '../components/Card';
 import { api } from '../lib/api';
 import type { Product, ProductHistoryRow } from '../lib/types';
@@ -25,6 +25,11 @@ type RemoveStockForm = {
   productName: string;
   qty: number;
   reason: string;
+};
+
+type DeleteProductForm = {
+  productId: string;
+  productName: string;
 };
 
 type EditProductForm = {
@@ -54,6 +59,7 @@ export function InventoryPage() {
 
   const [restock, setRestock] = useState<RestockForm | null>(null);
   const [removeStock, setRemoveStock] = useState<RemoveStockForm | null>(null);
+  const [deleteProduct, setDeleteProduct] = useState<DeleteProductForm | null>(null);
   const [editProduct, setEditProduct] = useState<EditProductForm | null>(null);
   const [historyFor, setHistoryFor] = useState<{ productId: string; productName: string } | null>(
     null
@@ -139,6 +145,14 @@ export function InventoryPage() {
     setRemoveStock(null);
   }
 
+  function openDeleteProduct(p: Product) {
+    setDeleteProduct({ productId: String(p.id), productName: p.name });
+  }
+
+  function closeDeleteProduct() {
+    setDeleteProduct(null);
+  }
+
   function openEdit(p: Product) {
     setEditProduct({
       productId: String(p.id),
@@ -195,6 +209,19 @@ export function InventoryPage() {
       await load();
     } catch (e: any) {
       alert(e?.message ?? 'Failed to update product');
+    }
+  }
+
+  async function submitDeleteProduct() {
+    if (!deleteProduct) return;
+    try {
+      await api.del(`/api/products/${deleteProduct.productId}`);
+      // Optimistic UI: remove row immediately, then refresh to stay in sync.
+      setRows((prev) => prev.filter((r) => String(r.id) !== String(deleteProduct.productId)));
+      closeDeleteProduct();
+      await load();
+    } catch (e: any) {
+      alert(e?.message ?? 'Failed to remove product');
     }
   }
 
@@ -283,7 +310,7 @@ export function InventoryPage() {
                       </span>
                     </td>
                     <td className='px-5 py-4'>
-                      <div className='flex items-center gap-2'>
+                      <div className='flex flex-wrap items-center gap-2'>
                         <button
                           type='button'
                           onClick={() => openHistory(p)}
@@ -312,8 +339,17 @@ export function InventoryPage() {
                         <button
                           type='button'
                           onClick={() => openRemoveStock(p)}
-                          className='rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm hover:bg-red-50'
+                          className='rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50'
                         >
+                          Remove Stock
+                        </button>
+                        <button
+                          type='button'
+                          onClick={() => openDeleteProduct(p)}
+                          className='inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm hover:bg-red-50'
+                          title='Remove product from inventory'
+                        >
+                          <Trash2 size={16} />
                           Remove
                         </button>
                       </div>
@@ -647,6 +683,49 @@ export function InventoryPage() {
                 className='mt-2 w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white shadow-soft hover:bg-red-700'
               >
                 Remove Stock
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteProduct && (
+        <div className='fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4'>
+          <div className='w-full max-w-xl rounded-2xl bg-white p-8 shadow-soft'>
+            <div className='flex items-center justify-between'>
+              <div className='text-lg font-extrabold text-slate-900'>Remove Product</div>
+              <button
+                type='button'
+                onClick={closeDeleteProduct}
+                className='rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                aria-label='Close'
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className='mt-2 text-sm text-slate-600'>
+              This removes the product from Inventory and POS. Sales history stays intact.
+            </div>
+
+            <div className='mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800'>
+              You are about to remove <span className='font-semibold'>{deleteProduct.productName}</span>.
+            </div>
+
+            <div className='mt-6 flex items-center justify-end gap-3'>
+              <button
+                type='button'
+                onClick={closeDeleteProduct}
+                className='rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50'
+              >
+                Cancel
+              </button>
+              <button
+                type='button'
+                onClick={submitDeleteProduct}
+                className='rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-soft hover:bg-red-700'
+              >
+                Remove
               </button>
             </div>
           </div>

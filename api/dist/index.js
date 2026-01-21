@@ -9,7 +9,7 @@ import { findUserByUsername, hashPassword, signToken, verifyPassword } from './a
 import { audit } from './audit.js';
 import { requireAuth, requireRole } from './middleware/authz.js';
 import { CreateCustomerSchema, CreateExpenseSchema, CreateProductSchema, CreateSaleSchema, DecreaseStockSchema, RefundSaleSchema, RestockSchema, UpdateCustomerSchema, UpdateProductSchema } from './schemas.js';
-import { createProduct, decreaseStockProduct, inventorySummary, listProducts, productStockHistory, restockProduct, updateProduct } from './inventory.js';
+import { archiveProduct, createProduct, decreaseStockProduct, inventorySummary, listProducts, productStockHistory, restockProduct, updateProduct } from './inventory.js';
 import { createSale, getSaleByReceipt, getSalesHistory, refundSaleByReceipt, salesReport } from './sales.js';
 import { createCustomer, listCustomers, updateCustomer } from './customers.js';
 import { createExpense, getExpense, listExpenses } from './expenses.js';
@@ -268,6 +268,16 @@ app.put('/api/products/:id', requireRole(['owner']), asyncHandler(async (req, re
     await updateProduct(String(req.params.id), parsed.data);
     await audit(req, req.user ?? null, 'product.update', 'product', String(req.params.id), parsed.data);
     res.json({ ok: true });
+}));
+app.delete('/api/products/:id', requireRole(['owner']), asyncHandler(async (req, res) => {
+    try {
+        await archiveProduct(String(req.params.id));
+        await audit(req, req.user ?? null, 'product.archive', 'product', String(req.params.id));
+        res.json({ ok: true });
+    }
+    catch (e) {
+        res.status(400).json({ error: e?.message ?? 'Failed to remove product' });
+    }
 }));
 app.post('/api/products/:id/restock', requireRole(['owner']), asyncHandler(async (req, res) => {
     const parsed = RestockSchema.safeParse(req.body);

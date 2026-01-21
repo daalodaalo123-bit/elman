@@ -21,6 +21,8 @@ export async function createSale(input) {
                 const prod = await Product.findById(new mongoose.Types.ObjectId(it.product_id)).session(session);
                 if (!prod)
                     throw new Error(`Product not found: ${it.product_id}`);
+                if (prod.archived)
+                    throw new Error(`Product is archived: ${it.product_id}`);
                 if (prod.stock < it.qty)
                     throw new Error(`Insufficient stock for ${prod.name}. Available: ${prod.stock}`);
                 const unit_price = it.unit_price ?? Number(prod.price);

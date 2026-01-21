@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { InventoryLog, Product } from './models.js';
 export async function listProducts() {
-    const rows = await Product.find({}).sort({ name: 1 }).lean();
+    const rows = await Product.find({ archived: { $ne: true } }).sort({ name: 1 }).lean();
     return rows.map((p) => ({
         id: String(p._id),
         name: p.name,
@@ -22,7 +22,8 @@ export async function createProduct(input) {
         price: input.price,
         unit_cost: input.unit_cost ?? 0,
         stock: input.stock ?? 0,
-        low_stock_threshold: input.low_stock_threshold ?? 0
+        low_stock_threshold: input.low_stock_threshold ?? 0,
+        archived: false
     });
     if ((input.stock ?? 0) > 0) {
         await InventoryLog.create({
@@ -118,4 +119,14 @@ export async function inventorySummary() {
         reason: h.reason
     }));
     return { totals, history: mappedHistory };
+}
+export async function archiveProduct(id) {
+    const _id = new mongoose.Types.ObjectId(id);
+    const res = await Product.updateOne({ _id, archived: { $ne: true } }, { $set: { archived: true, archived_at: new Date() } });
+    if (!res.matchedCount) {
+        const exists = await Product.exists({ _id });
+        if (!exists)
+            throw new Error('Product not found');
+        // already archived: treat as OK
+    }
 }
