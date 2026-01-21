@@ -277,8 +277,8 @@ export function ExpensesPage() {
 
       {/* Details modal */}
       {openId != null && (
-        <div className='modal-overlay fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4'>
-          <div className='modal-content w-full max-w-3xl rounded-2xl bg-white p-8 shadow-soft'>
+        <div className='modal-overlay fixed inset-0 z-20 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:items-center'>
+          <div className='modal-content my-8 w-full max-w-3xl rounded-2xl bg-white p-6 shadow-soft sm:p-8'>
             <div className='flex items-center justify-between'>
               <div className='text-lg font-extrabold text-slate-900'>Expense Details</div>
               <div className='flex items-center gap-2'>
@@ -333,7 +333,7 @@ export function ExpensesPage() {
 
                 <div>
                   <div className='text-sm font-extrabold text-slate-900'>Items</div>
-                  <div className='mt-3 overflow-hidden rounded-xl border border-slate-200'>
+                  <div className='mt-3 overflow-x-auto rounded-xl border border-slate-200'>
                     <table className='w-full text-left text-sm'>
                       <thead className='bg-slate-50 text-slate-600'>
                         <tr>
@@ -374,8 +374,8 @@ export function ExpensesPage() {
 
       {/* Add modal */}
       {showAdd && (
-        <div className='modal-overlay fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4'>
-          <div className='modal-content w-full max-w-3xl rounded-2xl bg-white p-8 shadow-soft'>
+        <div className='modal-overlay fixed inset-0 z-20 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:items-center'>
+          <div className='modal-content my-8 w-full max-w-3xl rounded-2xl bg-white p-6 shadow-soft sm:p-8'>
             <div className='flex items-center justify-between'>
               <div className='text-lg font-extrabold text-slate-900'>Add Expense</div>
               <button
@@ -462,7 +462,7 @@ export function ExpensesPage() {
                 </button>
               </div>
 
-              <div className='mt-3 overflow-hidden rounded-xl border border-slate-200'>
+              <div className='mt-3 overflow-x-auto rounded-xl border border-slate-200'>
                 <table className='w-full text-left text-sm'>
                   <thead className='bg-slate-50 text-slate-600'>
                     <tr>

@@ -306,8 +306,8 @@ export function CustomersPage() {
       </Card>
 
       {showModal && (
-        <div className='fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4'>
-          <div className='w-full max-w-xl rounded-2xl bg-white p-8 shadow-soft'>
+        <div className='fixed inset-0 z-20 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:items-center'>
+          <div className='my-8 w-full max-w-xl rounded-2xl bg-white p-6 shadow-soft sm:p-8'>
             <div className='flex items-center justify-between'>
               <div className='text-lg font-extrabold text-slate-900'>
                 {editing ? 'Edit Customer' : 'Add New Customer'}

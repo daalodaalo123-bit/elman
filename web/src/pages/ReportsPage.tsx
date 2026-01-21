@@ -85,7 +85,7 @@ export function ReportsPage() {
 
       <Card className='mt-6 p-6'>
         <div className='text-xl font-extrabold'>Inventory Movement History</div>
-        <div className='mt-4 overflow-hidden rounded-xl border border-slate-200'>
+        <div className='mt-4 overflow-x-auto rounded-xl border border-slate-200'>
           <table className='w-full text-left text-sm'>
             <thead className='bg-slate-50 text-slate-600'>
               <tr>

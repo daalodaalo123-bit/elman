@@ -229,8 +229,8 @@ export function HistoryPage() {
       </Card>
 
       {refund && (
-        <div className='fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4'>
-          <div className='w-full max-w-3xl rounded-2xl bg-white p-8 shadow-soft'>
+        <div className='fixed inset-0 z-20 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:items-center'>
+          <div className='my-8 w-full max-w-3xl rounded-2xl bg-white p-6 shadow-soft sm:p-8'>
             <div className='flex items-center justify-between'>
               <div className='text-lg font-extrabold text-slate-900'>Refund / Return</div>
               <button
@@ -254,7 +254,7 @@ export function HistoryPage() {
               />
             </div>
 
-            <div className='mt-5 overflow-hidden rounded-xl border border-slate-200'>
+            <div className='mt-5 overflow-x-auto rounded-xl border border-slate-200'>
               <table className='w-full text-left text-sm'>
                 <thead className='bg-slate-50 text-slate-600'>
                   <tr>
