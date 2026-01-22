@@ -97,6 +97,7 @@ export type SaleItem = {
   product_name: string;
   qty: number;
   unit_price: number;
+  discount: number;
   line_total: number;
 };
 
@@ -106,6 +107,7 @@ const SaleItemSchema = new Schema<SaleItem>(
     product_name: { type: String, required: true },
     qty: { type: Number, required: true, min: 1 },
     unit_price: { type: Number, required: true, min: 0 },
+    discount: { type: Number, required: true, min: 0, default: 0 },
     line_total: { type: Number, required: true, min: 0 }
   },
   { _id: false }

@@ -602,12 +602,19 @@ app.get(
       kv(doc, 'Payment', String(sale.payment_method));
       hr(doc);
 
-      const widths = [240, 60, 90, 90];
-      tableHeader(doc, ['Item', 'Qty', 'Unit', 'Total'], widths);
+      const widths = [180, 50, 70, 70, 70];
+      tableHeader(doc, ['Item', 'Qty', 'Unit', 'Discount', 'Total'], widths);
       for (const it of sale.items) {
+        const itemDiscount = Number(it.discount ?? 0);
         tableRow(
           doc,
-          [String(it.product_name), String(it.qty), money(it.unit_price), money(it.line_total)],
+          [
+            String(it.product_name),
+            String(it.qty),
+            money(it.unit_price),
+            itemDiscount > 0 ? money(itemDiscount) : '—',
+            money(it.line_total)
+          ],
           widths
         );
       }

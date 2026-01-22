@@ -47,6 +47,7 @@ const SaleItemSchema = new Schema({
     product_name: { type: String, required: true },
     qty: { type: Number, required: true, min: 1 },
     unit_price: { type: Number, required: true, min: 0 },
+    discount: { type: Number, required: true, min: 0, default: 0 },
     line_total: { type: Number, required: true, min: 0 }
 }, { _id: false });
 const SaleSchema = new Schema({

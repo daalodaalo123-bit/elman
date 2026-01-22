@@ -133,6 +133,7 @@ export type SaleDetail = {
     product_name: string;
     qty: number;
     unit_price: number;
+    discount: number;
     line_total: number;
   }>;
 };

@@ -26,18 +26,24 @@ export async function createSale(input) {
                 if (prod.stock < it.qty)
                     throw new Error(`Insufficient stock for ${prod.name}. Available: ${prod.stock}`);
                 const unit_price = it.unit_price ?? Number(prod.price);
-                const line_total = unit_price * it.qty;
-                subtotal += line_total;
+                const item_discount = Number(it.discount ?? 0);
+                const line_total_before_discount = unit_price * it.qty;
+                const line_total = Math.max(0, line_total_before_discount - item_discount);
+                subtotal += line_total_before_discount;
                 items.push({
                     product_id: prod._id,
                     product_name: prod.name,
                     qty: it.qty,
                     unit_price,
+                    discount: item_discount,
                     line_total
                 });
             }
+            // Calculate subtotal after item discounts
+            const subtotal_after_item_discounts = items.reduce((sum, it) => sum + it.line_total, 0);
+            // Apply overall discount
             const discount = Number(input.discount ?? 0);
-            const total = Math.max(0, subtotal - discount);
+            const total = Math.max(0, subtotal_after_item_discounts - discount);
             const customer_id = input.customer_id ? String(input.customer_id) : undefined;
             const customer_name = await resolveCustomerName(customer_id, input.customer ?? null);
             const sale_date = input.sale_date ? new Date(String(input.sale_date)) : new Date();
@@ -49,7 +55,7 @@ export async function createSale(input) {
                     customer: customer_name ?? undefined,
                     customer_id: customer_id ? new mongoose.Types.ObjectId(customer_id) : undefined,
                     payment_method: input.payment_method,
-                    subtotal,
+                    subtotal: subtotal_after_item_discounts,
                     discount,
                     total,
                     unpaid: Boolean(input.unpaid),
@@ -130,6 +136,7 @@ export async function getSaleByReceipt(receipt_ref) {
             product_name: it.product_name,
             qty: it.qty,
             unit_price: it.unit_price,
+            discount: Number(it.discount ?? 0),
             line_total: it.line_total
         }))
     };

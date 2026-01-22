@@ -12,6 +12,7 @@ type CartItem = {
   name: string;
   unit_price: number;
   qty: number;
+  discount: number;
 };
 
 type DiscountMode = 'amount' | 'percent';
@@ -92,7 +93,13 @@ export function PosPage() {
     [products, selectedProductId]
   );
 
-  const subtotal = useMemo(() => cart.reduce((s, it) => s + it.unit_price * it.qty, 0), [cart]);
+  const subtotal = useMemo(() => {
+    return cart.reduce((s, it) => {
+      const lineTotalBeforeDiscount = it.unit_price * it.qty;
+      const lineTotal = Math.max(0, lineTotalBeforeDiscount - (it.discount || 0));
+      return s + lineTotal;
+    }, 0);
+  }, [cart]);
 
   const discountAmount = useMemo(() => {
     const d = Number(discount || 0);
@@ -202,10 +209,23 @@ export function PosPage() {
           product_id: selectedProduct.id,
           name: selectedProduct.name,
           unit_price: Number(selectedProduct.price),
-          qty: q
+          qty: q,
+          discount: 0
         }
       ];
     });
+  }
+
+  function updateCartItemDiscount(index: number, discount: number) {
+    setCart((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], discount: Math.max(0, Number(discount) || 0) };
+      return next;
+    });
+  }
+
+  function removeCartItem(index: number) {
+    setCart((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function completeSale() {
@@ -220,7 +240,11 @@ export function PosPage() {
         payment_method: payment,
         discount: Number(discountAmount || 0),
         unpaid: false,
-        items: cart.map((c) => ({ product_id: c.product_id, qty: c.qty }))
+        items: cart.map((c) => ({
+          product_id: c.product_id,
+          qty: c.qty,
+          discount: Number(c.discount || 0)
+        }))
       });
       setLastReceipt(res.receipt_ref);
       setCart([]);
@@ -426,27 +450,63 @@ export function PosPage() {
                     <th className='px-4 py-3 font-medium'>Item Name</th>
                     <th className='px-4 py-3 font-medium'>Price</th>
                     <th className='px-4 py-3 font-medium'>Qty</th>
+                    <th className='px-4 py-3 font-medium'>Discount</th>
                     <th className='px-4 py-3 font-medium'>Total</th>
+                    <th className='px-4 py-3 font-medium'></th>
                   </tr>
                 </thead>
                 <tbody>
                   {cart.length === 0 ? (
                     <tr>
-                      <td className='px-4 py-10 text-center text-slate-500' colSpan={4}>
+                      <td className='px-4 py-10 text-center text-slate-500' colSpan={6}>
                         No items added yet
                       </td>
                     </tr>
                   ) : (
-                    cart.map((it) => (
-                      <tr key={it.product_id} className='border-t border-slate-200'>
-                        <td className='px-4 py-3 font-medium text-slate-900'>{it.name}</td>
-                        <td className='px-4 py-3 text-slate-600'>{money(it.unit_price)}</td>
-                        <td className='px-4 py-3 text-slate-600'>{it.qty}</td>
-                        <td className='px-4 py-3 font-semibold text-slate-900'>
-                          {money(it.unit_price * it.qty)}
-                        </td>
-                      </tr>
-                    ))
+                    cart.map((it, idx) => {
+                      const lineTotalBeforeDiscount = it.unit_price * it.qty;
+                      const lineTotal = Math.max(0, lineTotalBeforeDiscount - (it.discount || 0));
+                      return (
+                        <tr key={`${it.product_id}-${idx}`} className='border-t border-slate-200'>
+                          <td className='px-4 py-3 font-medium text-slate-900'>{it.name}</td>
+                          <td className='px-4 py-3 text-slate-600'>{money(it.unit_price)}</td>
+                          <td className='px-4 py-3 text-slate-600'>{it.qty}</td>
+                          <td className='px-4 py-3'>
+                            <input
+                              type='number'
+                              min={0}
+                              step='0.01'
+                              className='w-24 rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm outline-none focus:border-brand-300'
+                              value={it.discount || 0}
+                              onChange={(e) => updateCartItemDiscount(idx, Number(e.target.value))}
+                              placeholder='0.00'
+                            />
+                            {it.discount > 0 && (
+                              <div className='mt-1 text-xs text-slate-500'>
+                                {money(it.discount)} off
+                              </div>
+                            )}
+                          </td>
+                          <td className='px-4 py-3 font-semibold text-slate-900'>
+                            {money(lineTotal)}
+                            {it.discount > 0 && (
+                              <div className='text-xs font-normal text-slate-500 line-through'>
+                                {money(lineTotalBeforeDiscount)}
+                              </div>
+                            )}
+                          </td>
+                          <td className='px-4 py-3'>
+                            <button
+                              type='button'
+                              onClick={() => removeCartItem(idx)}
+                              className='rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50'
+                            >
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

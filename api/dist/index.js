@@ -86,8 +86,11 @@ app.post('/api/auth/login', asyncHandler(async (req, res) => {
         password: z.string().min(1)
     });
     const parsed = schema.safeParse(req.body);
-    if (!parsed.success)
-        return res.status(400).json(parsed.error.flatten());
+    if (!parsed.success) {
+        const errors = parsed.error.flatten().fieldErrors;
+        const errorMsg = Object.values(errors).flat().join(', ') || 'Invalid input';
+        return res.status(400).json({ error: errorMsg });
+    }
     const u = await findUserByUsername(parsed.data.username.trim());
     if (!u)
         return res.status(401).json({ error: 'Invalid username or password' });
@@ -394,10 +397,17 @@ app.get('/api/sales/:receipt_ref/pdf', requireRole(['owner', 'cashier']), asyncH
         kv(doc, 'Customer', sale.customer ?? '');
         kv(doc, 'Payment', String(sale.payment_method));
         hr(doc);
-        const widths = [240, 60, 90, 90];
-        tableHeader(doc, ['Item', 'Qty', 'Unit', 'Total'], widths);
+        const widths = [180, 50, 70, 70, 70];
+        tableHeader(doc, ['Item', 'Qty', 'Unit', 'Discount', 'Total'], widths);
         for (const it of sale.items) {
-            tableRow(doc, [String(it.product_name), String(it.qty), money(it.unit_price), money(it.line_total)], widths);
+            const itemDiscount = Number(it.discount ?? 0);
+            tableRow(doc, [
+                String(it.product_name),
+                String(it.qty),
+                money(it.unit_price),
+                itemDiscount > 0 ? money(itemDiscount) : '—',
+                money(it.line_total)
+            ], widths);
         }
         hr(doc);
         kv(doc, 'Subtotal', money(sale.subtotal));

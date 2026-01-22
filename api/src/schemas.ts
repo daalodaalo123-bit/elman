@@ -49,7 +49,8 @@ export const CreateSaleSchema = z.object({
       z.object({
         product_id: z.string().min(1),
         qty: z.number().int().positive(),
-        unit_price: z.number().nonnegative().optional()
+        unit_price: z.number().nonnegative().optional(),
+        discount: z.number().nonnegative().optional().default(0)
       })
     )
     .min(1)
