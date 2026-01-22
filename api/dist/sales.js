@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { Customer, InventoryLog, Product, Refund, Sale } from './models.js';
 import { makeReceiptRef } from './utils.js';
+import { sendPurchaseConfirmation } from './twilio.js';
 async function resolveCustomerName(customer_id, customer) {
     if (customer_id) {
         const c = await Customer.findById(new mongoose.Types.ObjectId(customer_id)).lean();
@@ -11,9 +12,14 @@ async function resolveCustomerName(customer_id, customer) {
 }
 export async function createSale(input) {
     const receipt_ref = makeReceiptRef();
+    // Capture data for SMS before transaction
+    const customer_id_for_sms = input.customer_id ? String(input.customer_id) : undefined;
+    const payment_method_for_sms = input.payment_method;
     const session = await mongoose.startSession();
     try {
         let result;
+        let total_for_sms = 0;
+        let items_for_sms = [];
         await session.withTransaction(async () => {
             let subtotal = 0;
             const items = [];
@@ -47,6 +53,9 @@ export async function createSale(input) {
             const customer_id = input.customer_id ? String(input.customer_id) : undefined;
             const customer_name = await resolveCustomerName(customer_id, input.customer ?? null);
             const sale_date = input.sale_date ? new Date(String(input.sale_date)) : new Date();
+            // Store values for SMS notification (outside transaction)
+            total_for_sms = total;
+            items_for_sms = items.map(it => ({ product_name: it.product_name, qty: it.qty }));
             const sale = await Sale.create([
                 {
                     receipt_ref,
@@ -84,6 +93,23 @@ export async function createSale(input) {
                 sale_date: sale_date.toISOString()
             };
         });
+        // Send SMS notification after transaction completes (non-blocking)
+        if (customer_id_for_sms) {
+            try {
+                const customer = await Customer.findById(new mongoose.Types.ObjectId(customer_id_for_sms)).lean();
+                if (customer?.phone) {
+                    // Send SMS asynchronously - don't block the response
+                    sendPurchaseConfirmation(customer.phone, receipt_ref, total_for_sms, items_for_sms, payment_method_for_sms).catch((err) => {
+                        console.error('Failed to send purchase confirmation SMS:', err);
+                        // Don't throw - SMS failure shouldn't break the sale
+                    });
+                }
+            }
+            catch (err) {
+                console.error('Error sending SMS notification:', err);
+                // Continue - SMS is optional
+            }
+        }
         return result;
     }
     finally {

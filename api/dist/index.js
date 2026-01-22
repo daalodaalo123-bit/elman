@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { z } from 'zod';
 import path from 'node:path';
 import fs from 'node:fs';
+import mongoose from 'mongoose';
 import { connectDb, dbStatus } from './db/db.js';
 import { findUserByUsername, hashPassword, signToken, verifyPassword } from './auth.js';
 import { audit } from './audit.js';
@@ -15,7 +16,8 @@ import { createCustomer, listCustomers, updateCustomer } from './customers.js';
 import { createExpense, getExpense, listExpenses } from './expenses.js';
 import { sendPdf, hr, kv, money, tableHeader, tableRow, title } from './pdf.js';
 import { customerInsightsReport, lowStockReport, profitReport, topProductsReport } from './reports.js';
-import { AuditLog, User } from './models.js';
+import { AuditLog, Customer, User } from './models.js';
+import { sendUpdateNotification, isTwilioConfigured } from './twilio.js';
 // Ensure local `api/.env` reliably overrides any pre-existing environment variables (Windows often has stale env)
 dotenv.config({ override: true });
 const app = express();
@@ -134,6 +136,70 @@ app.put('/api/customers/:id', requireRole(['owner']), asyncHandler(async (req, r
     await updateCustomer(String(req.params.id), parsed.data);
     await audit(req, req.user ?? null, 'customer.update', 'customer', String(req.params.id), parsed.data);
     res.json({ ok: true });
+}));
+// Send update notification to customers (Owner only)
+app.post('/api/customers/notify', requireRole(['owner']), asyncHandler(async (req, res) => {
+    if (!isTwilioConfigured()) {
+        return res.status(400).json({ error: 'Twilio is not configured. Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in your .env file.' });
+    }
+    const schema = z.object({
+        message: z.string().min(1),
+        customer_ids: z.array(z.string()).optional(),
+        send_to_all: z.boolean().optional().default(false)
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success)
+        return res.status(400).json(parsed.error.flatten());
+    const { message, customer_ids, send_to_all } = parsed.data;
+    let customers;
+    if (send_to_all) {
+        customers = await Customer.find({
+            phone: { $exists: true, $ne: null, $nin: ['', null] }
+        }).select('_id name phone').lean();
+    }
+    else if (customer_ids && customer_ids.length > 0) {
+        customers = await Customer.find({
+            _id: { $in: customer_ids.map(id => new mongoose.Types.ObjectId(id)) },
+            phone: { $exists: true, $ne: null, $nin: ['', null] }
+        }).select('_id name phone').lean();
+    }
+    else {
+        return res.status(400).json({ error: 'Either send_to_all must be true or customer_ids must be provided' });
+    }
+    const results = [];
+    let successCount = 0;
+    let failCount = 0;
+    for (const customer of customers) {
+        if (!customer.phone)
+            continue;
+        const result = await sendUpdateNotification(String(customer.phone), message);
+        results.push({
+            customer_id: String(customer._id),
+            customer_name: customer.name,
+            phone: customer.phone,
+            success: result.success,
+            error: result.error
+        });
+        if (result.success) {
+            successCount++;
+        }
+        else {
+            failCount++;
+        }
+    }
+    await audit(req, req.user ?? null, 'customer.notify', 'customer', 'bulk', {
+        message,
+        total_sent: customers.length,
+        success_count: successCount,
+        fail_count: failCount
+    });
+    res.json({
+        ok: true,
+        total: customers.length,
+        success: successCount,
+        failed: failCount,
+        results
+    });
 }));
 // --- Expenses ---
 app.get('/api/expenses', requireRole(['owner']), asyncHandler(async (req, res) => {

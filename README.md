@@ -9,6 +9,11 @@ MONGODB_URI=your_mongodb_connection_string
 JWT_SECRET=some_long_random_secret
 BOOTSTRAP_SECRET=some_long_random_secret
 NODE_ENV=development
+
+# Twilio SMS (Optional - for customer notifications)
+TWILIO_ACCOUNT_SID=your_twilio_account_sid
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_PHONE_NUMBER=+1234567890
 ```
 
 2) Install deps:
@@ -102,6 +107,9 @@ This backend uses **MongoDB** (Atlas recommended).
   - `JWT_SECRET`
   - `BOOTSTRAP_SECRET`
   - `NODE_ENV=production`
+  - `TWILIO_ACCOUNT_SID` (optional - for SMS notifications)
+  - `TWILIO_AUTH_TOKEN` (optional - for SMS notifications)
+  - `TWILIO_PHONE_NUMBER` (optional - for SMS notifications, format: +1234567890)
 - MongoDB Atlas:
   - Ensure the DB user/password in `MONGODB_URI` are correct
   - Ensure **Network Access** allows Render’s IPs (for quick testing you can allow `0.0.0.0/0`, then tighten later)
@@ -123,3 +131,39 @@ curl -X POST https://<your-service>.onrender.com/api/auth/reset-password \
   -H "x-bootstrap-secret: <BOOTSTRAP_SECRET>" \
   -d "{\"username\":\"owner\",\"new_password\":\"ownerpass123\"}"
 ```
+
+### Twilio SMS Integration
+
+The system can automatically send SMS notifications to customers:
+
+1. **Purchase Confirmations**: Automatically sent when a customer makes a purchase (if customer has phone number in CRM)
+
+2. **Update Notifications**: Send custom messages to customers via API:
+   ```bash
+   curl -X POST http://localhost:5050/api/customers/notify \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer <YOUR_TOKEN>" \
+     -d '{
+       "message": "New products available! Visit us today.",
+       "send_to_all": true
+     }'
+   ```
+
+   Or send to specific customers:
+   ```bash
+   curl -X POST http://localhost:5050/api/customers/notify \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer <YOUR_TOKEN>" \
+     -d '{
+       "message": "Special discount just for you!",
+       "customer_ids": ["customer_id_1", "customer_id_2"]
+     }'
+   ```
+
+**Setup:**
+1. Sign up for a Twilio account at https://www.twilio.com
+2. Get your Account SID and Auth Token from the Twilio Console
+3. Get a phone number from Twilio (or use your existing one)
+4. Add the credentials to your `api/.env` file
+
+**Note:** SMS notifications are optional. If Twilio is not configured, the system will continue to work normally without sending SMS messages.
