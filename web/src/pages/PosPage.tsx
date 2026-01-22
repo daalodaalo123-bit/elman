@@ -384,6 +384,12 @@ export function PosPage() {
                 {cart.length} items
               </div>
             </div>
+            
+            {cart.length > 0 && (
+              <div className='mt-3 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs text-brand-700'>
+                💡 <strong>Tip:</strong> Enter a discount amount in the "Discount" column for any item to apply a discount to that specific item.
+              </div>
+            )}
 
             <div className='mt-3 flex flex-wrap items-center justify-between gap-3'>
               <div className='text-xs text-slate-500'>
@@ -450,7 +456,12 @@ export function PosPage() {
                     <th className='px-4 py-3 font-medium'>Item Name</th>
                     <th className='px-4 py-3 font-medium'>Price</th>
                     <th className='px-4 py-3 font-medium'>Qty</th>
-                    <th className='px-4 py-3 font-medium'>Discount</th>
+                    <th className='px-4 py-3 font-medium'>
+                      <div className='flex items-center gap-1'>
+                        <span>Discount</span>
+                        <span className='text-xs text-slate-400'>(per item)</span>
+                      </div>
+                    </th>
                     <th className='px-4 py-3 font-medium'>Total</th>
                     <th className='px-4 py-3 font-medium'></th>
                   </tr>
@@ -472,28 +483,37 @@ export function PosPage() {
                           <td className='px-4 py-3 text-slate-600'>{money(it.unit_price)}</td>
                           <td className='px-4 py-3 text-slate-600'>{it.qty}</td>
                           <td className='px-4 py-3'>
-                            <input
-                              type='number'
-                              min={0}
-                              step='0.01'
-                              className='w-24 rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm outline-none focus:border-brand-300'
-                              value={it.discount || 0}
-                              onChange={(e) => updateCartItemDiscount(idx, Number(e.target.value))}
-                              placeholder='0.00'
-                            />
-                            {it.discount > 0 && (
-                              <div className='mt-1 text-xs text-slate-500'>
-                                {money(it.discount)} off
-                              </div>
-                            )}
+                            <div className='flex flex-col gap-1'>
+                              <input
+                                type='number'
+                                min={0}
+                                step='0.01'
+                                className='w-28 rounded-lg border-2 border-brand-200 bg-white px-3 py-2 text-sm font-medium outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200'
+                                value={it.discount || 0}
+                                onChange={(e) => updateCartItemDiscount(idx, Number(e.target.value))}
+                                placeholder='0.00'
+                                title='Enter discount amount for this item'
+                              />
+                              {it.discount > 0 && (
+                                <div className='text-xs font-semibold text-emerald-600'>
+                                  -{money(it.discount)}
+                                </div>
+                              )}
+                            </div>
                           </td>
                           <td className='px-4 py-3 font-semibold text-slate-900'>
-                            {money(lineTotal)}
-                            {it.discount > 0 && (
-                              <div className='text-xs font-normal text-slate-500 line-through'>
-                                {money(lineTotalBeforeDiscount)}
-                              </div>
-                            )}
+                            <div className='flex flex-col'>
+                              {it.discount > 0 ? (
+                                <>
+                                  <span className='text-emerald-600'>{money(lineTotal)}</span>
+                                  <span className='text-xs font-normal text-slate-400 line-through'>
+                                    {money(lineTotalBeforeDiscount)}
+                                  </span>
+                                </>
+                              ) : (
+                                <span>{money(lineTotal)}</span>
+                              )}
+                            </div>
                           </td>
                           <td className='px-4 py-3'>
                             <button
