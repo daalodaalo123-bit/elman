@@ -13,6 +13,9 @@ let client: twilio.Twilio | null = null;
 
 if (accountSid && authToken) {
   client = twilio(accountSid, authToken);
+  console.log(`[Twilio] ✅ Twilio client initialized. Mode: ${useWhatsApp ? 'WhatsApp' : 'SMS'}, From: ${fromNumber}`);
+} else {
+  console.log('[Twilio] ⚠️ Twilio not configured - SMS/WhatsApp features disabled');
 }
 
 /**
@@ -56,6 +59,7 @@ export async function sendSMS(to: string, message: string): Promise<{ success: b
   try {
     const normalizedPhone = normalizePhoneNumber(to);
     if (!normalizedPhone) {
+      console.error(`[Twilio] Invalid phone number format: ${to}`);
       return { success: false, error: `Invalid phone number format: ${to}` };
     }
 
@@ -63,15 +67,24 @@ export async function sendSMS(to: string, message: string): Promise<{ success: b
     const from = useWhatsApp ? `whatsapp:${fromNumber}` : fromNumber;
     const toFormatted = useWhatsApp ? `whatsapp:${normalizedPhone}` : normalizedPhone;
 
+    console.log(`[Twilio] Sending ${useWhatsApp ? 'WhatsApp' : 'SMS'} from ${from} to ${toFormatted}`);
+
     const messageInstance = await client.messages.create({
       body: message,
       from: from,
       to: toFormatted
     });
 
+    console.log(`[Twilio] ✅ Message sent successfully. SID: ${messageInstance.sid}`);
     return { success: true, sid: messageInstance.sid };
   } catch (error: any) {
-    console.error(`Twilio ${useWhatsApp ? 'WhatsApp' : 'SMS'} error:`, error);
+    console.error(`[Twilio] ❌ ${useWhatsApp ? 'WhatsApp' : 'SMS'} error:`, error);
+    console.error(`[Twilio] Error details:`, {
+      code: error?.code,
+      message: error?.message,
+      status: error?.status,
+      moreInfo: error?.moreInfo
+    });
     return { 
       success: false, 
       error: error?.message || `Failed to send ${useWhatsApp ? 'WhatsApp message' : 'SMS'}` 

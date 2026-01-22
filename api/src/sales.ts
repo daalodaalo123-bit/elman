@@ -115,8 +115,10 @@ export async function createSale(input: any) {
     // Send SMS notification after transaction completes (non-blocking)
     if (customer_id_for_sms) {
       try {
+        console.log(`[WhatsApp] Attempting to send purchase confirmation for customer: ${customer_id_for_sms}`);
         const customer = await Customer.findById(new mongoose.Types.ObjectId(customer_id_for_sms)).lean();
         if (customer?.phone) {
+          console.log(`[WhatsApp] Customer found with phone: ${customer.phone}`);
           // Send SMS asynchronously - don't block the response
           sendPurchaseConfirmation(
             customer.phone,
@@ -124,15 +126,25 @@ export async function createSale(input: any) {
             total_for_sms,
             items_for_sms,
             payment_method_for_sms
-          ).catch((err) => {
-            console.error('Failed to send purchase confirmation SMS:', err);
+          ).then((result) => {
+            if (result.success) {
+              console.log(`[WhatsApp] ✅ Message sent successfully to ${customer.phone}`);
+            } else {
+              console.error(`[WhatsApp] ❌ Failed to send message: ${result.error}`);
+            }
+          }).catch((err) => {
+            console.error('[WhatsApp] ❌ Error sending purchase confirmation:', err);
             // Don't throw - SMS failure shouldn't break the sale
           });
+        } else {
+          console.log(`[WhatsApp] ⚠️ Customer ${customer_id_for_sms} has no phone number`);
         }
       } catch (err) {
-        console.error('Error sending SMS notification:', err);
+        console.error('[WhatsApp] ❌ Error sending SMS notification:', err);
         // Continue - SMS is optional
       }
+    } else {
+      console.log('[WhatsApp] ⚠️ No customer_id provided, skipping WhatsApp notification');
     }
 
     return result;
